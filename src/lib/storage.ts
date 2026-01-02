@@ -118,7 +118,7 @@ Indsatte filer
 		},
 		{
 			id: createLocalId(),
-			category: 'enhancement',
+			category: 'feature',
 			name: 'Start ny prompt',
 			description: 'Blank prompt starter',
 			fields: [
@@ -142,6 +142,68 @@ Indsatte filer
 
 Ekstra next steps (valgfrit)
 {{nextSteps}}`,
+			createdAt: timestamp,
+			updatedAt: timestamp,
+		},
+		{
+			id: createLocalId(),
+			category: 'enhancement',
+			name: 'Enhancement (standard)',
+			description: 'Standard enhancement prompt',
+			fields: [
+				defaultField({ key: 'featureId', label: 'Enhancement ID', required: true }),
+				defaultField({ key: 'title', label: 'Title' }),
+				defaultField({ key: 'goal', label: 'Goal', type: 'textarea' }),
+				defaultField({ key: 'scope', label: 'Scope', type: 'textarea' }),
+				defaultField({ key: 'constraints', label: 'Constraints', type: 'textarea' }),
+				defaultField({ key: 'filesInserted', label: 'Indsatte filer', type: 'textarea' }),
+			],
+			body: `Enhancement: {{featureId}} – {{title}}
+
+Mål
+{{goal}}
+
+Scope
+{{scope}}
+
+Constraints
+{{constraints}}
+
+Indsatte filer
+{{filesInserted}}`,
+			createdAt: timestamp,
+			updatedAt: timestamp,
+		},
+		{
+			id: createLocalId(),
+			category: 'ui',
+			name: 'UI design update',
+			description: 'UI update prompt',
+			fields: [
+				defaultField({ key: 'featureId', label: 'Task ID', required: true }),
+				defaultField({ key: 'title', label: 'Title', required: true }),
+				defaultField({ key: 'goal', label: 'Goal', type: 'textarea' }),
+				defaultField({ key: 'scope', label: 'Scope', type: 'textarea' }),
+				defaultField({ key: 'constraints', label: 'Constraints', type: 'textarea' }),
+				defaultField({ key: 'designNotes', label: 'Design notes', type: 'textarea' }),
+				defaultField({ key: 'filesInserted', label: 'Assets / filer', type: 'textarea' }),
+			],
+			body: `UI update: {{featureId}} – {{title}}
+
+Goal
+{{goal}}
+
+Scope
+{{scope}}
+
+Constraints
+{{constraints}}
+
+Design notes
+{{designNotes}}
+
+Assets / filer
+{{filesInserted}}`,
 			createdAt: timestamp,
 			updatedAt: timestamp,
 		},
@@ -207,11 +269,23 @@ export const getActiveProject = (): Project | null => {
 	return loadProjects().find((project) => project.id === id) ?? null;
 };
 
+export const loadRunsForProject = (projectId: string | null): Run[] => {
+	const runs = loadRuns();
+	if (!projectId) return runs;
+	return runs.filter((run) => !run.projectId || run.projectId === projectId);
+};
+
 export const seedDefaultsIfEmpty = () => {
 	const storage = getStore();
 	if (!storage) return;
 	const existing = loadTemplates();
+	const defaults = createDefaultTemplates();
 	if (existing.length === 0) {
-		saveTemplates(createDefaultTemplates());
+		saveTemplates(defaults);
+		return;
+	}
+	const missing = defaults.filter((tpl) => !existing.some((t) => t.name === tpl.name));
+	if (missing.length) {
+		saveTemplates([...existing, ...missing]);
 	}
 };

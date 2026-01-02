@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { NEXT_STEPS_CHECKLIST, Project, Run, Template } from '@/lib/models';
 import { renderTemplate } from '@/lib/render';
+import { parsePastedSpec, WizardKind } from '@/lib/parse';
 import {
 	ACTIVE_PROJECT_EVENT,
 	getActiveProject,
@@ -12,6 +13,13 @@ import {
 	saveRuns,
 	seedDefaultsIfEmpty,
 } from '@/lib/storage';
+
+const typeOptions: { label: string; value: WizardKind }[] = [
+	{ label: 'Bug', value: 'bug' },
+	{ label: 'Feature', value: 'feature' },
+	{ label: 'Enhancement', value: 'enhancement' },
+	{ label: 'UI design update', value: 'ui' },
+];
 
 const createId = () => {
 	if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -26,6 +34,9 @@ export default function WizardPage() {
 	const [output, setOutput] = useState('');
 	const [status, setStatus] = useState<string | null>(null);
 	const [activeProject, setActiveProject] = useState<Project | null>(null);
+	const [wizardKind, setWizardKind] = useState<WizardKind>('bug');
+	const [pastedText, setPastedText] = useState('');
+	const kindRef = useRef<WizardKind | null>(null);
 
 	const selectedTemplate = useMemo(() => templates.find((t) => t.id === selectedId), [templates, selectedId]);
 
@@ -39,14 +50,28 @@ export default function WizardPage() {
 	}, []);
 
 	useEffect(() => {
+		if (!templates.length) return;
+		if (kindRef.current === wizardKind && selectedId) return;
+		const match = templates.find((tpl) => (tpl.category ?? 'feature') === wizardKind);
+		if (match) {
+			setSelectedId(match.id);
+		} else if (!selectedId && templates[0]) {
+			setSelectedId(templates[0].id);
+		}
+		kindRef.current = wizardKind;
+	}, [wizardKind, templates, selectedId]);
+
+	useEffect(() => {
 		if (!selectedTemplate) return;
-		const mapped: Record<string, string> = {};
-		selectedTemplate.fields.forEach((f) => {
-			mapped[f.key] = values[f.key] ?? '';
+		setValues((prev) => {
+			const next: Record<string, string> = {};
+			selectedTemplate.fields.forEach((field) => {
+				next[field.key] = prev[field.key] ?? '';
+			});
+			setOutput(renderTemplate(selectedTemplate.body, next));
+			return next;
 		});
-		setValues(mapped);
 		setTitle(`${selectedTemplate.name} – ${new Date().toLocaleDateString()}`);
-		setOutput(renderTemplate(selectedTemplate.body, mapped));
 	}, [selectedTemplate]);
 
 	useEffect(() => {
@@ -61,6 +86,39 @@ export default function WizardPage() {
 			}
 		};
 	}, []);
+
+	const handleParse = () => {
+		if (!selectedTemplate) {
+			setStatus('Vælg template før parse');
+			return;
+		}
+		if (!pastedText.trim()) {
+			setStatus('Indsæt tekst til parsing');
+			return;
+		}
+		const parsed = parsePastedSpec(wizardKind, pastedText);
+		const allowedKeys = new Set(selectedTemplate.fields.map((f) => f.key));
+		const next = { ...values };
+		let changed = false;
+
+		Object.entries(parsed).forEach(([key, value]) => {
+			if (!value) return;
+			if (key === 'title') setTitle(value);
+			if (allowedKeys.has(key)) {
+				next[key] = value;
+				changed = true;
+			}
+		});
+
+		if (!changed && !parsed.title) {
+			setStatus('Ingen matchende felter fundet');
+			return;
+		}
+
+		setValues(next);
+		setOutput(renderTemplate(selectedTemplate.body, next));
+		setStatus('Felter udfyldt – dobbelttjek efter parse');
+	};
 
 	const handleValueChange = (key: string, val: string) => {
 		const next = { ...values, [key]: val };
@@ -132,6 +190,39 @@ export default function WizardPage() {
 
 			<div className="grid gap-6 lg:grid-cols-2">
 				<section className="rounded-lg bg-white p-4 shadow-sm space-y-4">
+					<div className="space-y-4">
+						<label className="block text-sm font-semibold">
+							Type
+							<select
+								value={wizardKind}
+								onChange={(e) => setWizardKind(e.target.value as WizardKind)}
+								className="mt-1 w-full rounded border p-2"
+							>
+								{typeOptions.map((option) => (
+									<option key={option.value} value={option.value}>
+										{option.label}
+									</option>
+								))}
+							</select>
+						</label>
+
+						<label className="block text-sm font-semibold">
+							Paste specs
+							<textarea
+								value={pastedText}
+								onChange={(e) => setPastedText(e.target.value)}
+								rows={4}
+								className="mt-1 w-full rounded border p-2"
+								placeholder="Indsæt bug/feature beskrivelse her"
+							/>
+							<p className="mt-1 text-xs text-slate-500">Best effort parsing – tjek felter efter parse.</p>
+						</label>
+
+						<button onClick={handleParse} className="rounded bg-slate-900 px-4 py-2 text-white">
+							Parse &amp; udfyld
+						</button>
+					</div>
+
 					<div>
 						<label className="block text-sm font-semibold">Template</label>
 						<select

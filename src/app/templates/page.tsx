@@ -13,11 +13,13 @@ const newTemplate = (): Template => {
 		description: '',
 		fields: [],
 		body: '',
-		category: undefined,
+		category: 'feature',
 		createdAt: timestamp,
 		updatedAt: timestamp,
 	};
 };
+
+const ensureCategory = (tpl: Template): Template => (tpl.category ? tpl : { ...tpl, category: 'feature' });
 
 export default function TemplatesPage() {
 	const [templates, setTemplates] = useState<Template[]>([]);
@@ -27,18 +29,24 @@ export default function TemplatesPage() {
 
 	useEffect(() => {
 		seedDefaultsIfEmpty();
-		const data = loadTemplates();
-		setTemplates(data);
-		if (data.length) {
-			setSelectedId(data[0].id);
-			setDraft(structuredClone(data[0]));
+		const normalized = loadTemplates().map(ensureCategory);
+		setTemplates(normalized);
+		if (normalized.length) {
+			setSelectedId(normalized[0].id);
+			setDraft(structuredClone(normalized[0]));
 		}
 	}, []);
 
 	useEffect(() => {
 		if (!selectedId) return;
 		const tmpl = templates.find((t) => t.id === selectedId);
-		setDraft(tmpl ? structuredClone(tmpl) : null);
+		if (!tmpl) {
+			setDraft(null);
+			return;
+		}
+		const cloned = structuredClone(tmpl);
+		cloned.category ??= 'feature';
+		setDraft(cloned);
 	}, [selectedId, templates]);
 
 	const validationError = useMemo(() => {
@@ -87,6 +95,7 @@ export default function TemplatesPage() {
 		setError(null);
 		const updated: Template = {
 			...draft,
+			category: draft.category ?? 'feature',
 			updatedAt: new Date().toISOString(),
 		};
 		const next = templates.some((t) => t.id === updated.id)
@@ -174,7 +183,7 @@ export default function TemplatesPage() {
 						<label className="block text-sm font-semibold">
 							Category
 							<select
-								value={draft.category ?? ''}
+								value={draft.category ?? 'feature'}
 								onChange={(e) =>
 									setDraft({
 										...draft,
