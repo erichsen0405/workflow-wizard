@@ -1,9 +1,17 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { NEXT_STEPS_CHECKLIST, Run, Template } from '@/lib/models';
+import { NEXT_STEPS_CHECKLIST, Project, Run, Template } from '@/lib/models';
 import { renderTemplate } from '@/lib/render';
-import { loadRuns, loadTemplates, saveRuns, seedDefaultsIfEmpty } from '@/lib/storage';
+import {
+	ACTIVE_PROJECT_EVENT,
+	getActiveProject,
+	loadRuns,
+	loadTemplates,
+	saveRuns,
+	seedDefaultsIfEmpty,
+} from '@/lib/storage';
 
 const createId = () => {
 	if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -17,6 +25,7 @@ export default function WizardPage() {
 	const [title, setTitle] = useState('');
 	const [output, setOutput] = useState('');
 	const [status, setStatus] = useState<string | null>(null);
+	const [activeProject, setActiveProject] = useState<Project | null>(null);
 
 	const selectedTemplate = useMemo(() => templates.find((t) => t.id === selectedId), [templates, selectedId]);
 
@@ -39,6 +48,19 @@ export default function WizardPage() {
 		setTitle(`${selectedTemplate.name} – ${new Date().toLocaleDateString()}`);
 		setOutput(renderTemplate(selectedTemplate.body, mapped));
 	}, [selectedTemplate]);
+
+	useEffect(() => {
+		const update = () => setActiveProject(getActiveProject());
+		update();
+		if (typeof window !== 'undefined') {
+			window.addEventListener(ACTIVE_PROJECT_EVENT, update);
+		}
+		return () => {
+			if (typeof window !== 'undefined') {
+				window.removeEventListener(ACTIVE_PROJECT_EVENT, update);
+			}
+		};
+	}, []);
 
 	const handleValueChange = (key: string, val: string) => {
 		const next = { ...values, [key]: val };
@@ -65,11 +87,15 @@ export default function WizardPage() {
 	};
 
 	const handleSaveRun = () => {
-		if (!selectedTemplate) return;
+		if (!selectedTemplate || !activeProject) {
+			setStatus('Vælg projekt + template');
+			return;
+		}
 		const generated = output || renderTemplate(selectedTemplate.body, values);
 		const now = new Date().toISOString();
 		const newRun: Run = {
 			id: createId(),
+			projectId: activeProject.id,
 			templateId: selectedTemplate.id,
 			title: title || `${selectedTemplate.name} – ${new Date().toLocaleString()}`,
 			values,
@@ -82,11 +108,25 @@ export default function WizardPage() {
 		setStatus('Run gemt ✅');
 	};
 
+	if (!activeProject) {
+		return (
+			<div className="rounded-lg border bg-white p-6 text-sm text-slate-700">
+				Vælg eller opret et projekt under{' '}
+				<Link href="/projects" className="font-semibold text-slate-900 underline">
+					Projects
+				</Link>{' '}
+				for at bruge wizard.
+			</div>
+		);
+	}
+
 	return (
 		<div className="space-y-6">
 			<header className="rounded-lg bg-white p-4 shadow-sm">
 				<h1 className="text-2xl font-semibold">Workflow Wizard</h1>
-				<p className="text-sm text-slate-600">Vælg template, udfyld felter og gem runs lokalt.</p>
+				<p className="text-sm text-slate-600">
+					Aktivt projekt: <span className="font-semibold">{activeProject.name}</span>
+				</p>
 				{status && <p className="mt-2 text-sm text-emerald-600">{status}</p>}
 			</header>
 

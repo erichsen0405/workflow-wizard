@@ -3,16 +3,24 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Run } from '@/lib/models';
-import { loadRuns } from '@/lib/storage';
+import { loadProjects, loadRuns } from '@/lib/storage';
 
 export default function RunDetailPage() {
 	const params = useParams<{ id: string }>();
 	const router = useRouter();
 	const [run, setRun] = useState<Run | null>(null);
+	const [projectName, setProjectName] = useState<string>('Ingen');
 
 	useEffect(() => {
-		const found = loadRuns().find((r) => r.id === params.id);
+		const allRuns = loadRuns();
+		const found = allRuns.find((r) => r.id === params.id);
 		setRun(found ?? null);
+		if (found?.projectId) {
+			const project = loadProjects().find((p) => p.id === found.projectId);
+			setProjectName(project?.name ?? 'Slettet projekt');
+		} else {
+			setProjectName('Ingen');
+		}
 	}, [params.id]);
 
 	const copy = async (text: string) => {
@@ -39,7 +47,9 @@ export default function RunDetailPage() {
 			<header className="flex items-center justify-between">
 				<div>
 					<h1 className="text-2xl font-semibold">{run.title}</h1>
-					<p className="text-sm text-slate-600">{new Date(run.createdAt).toLocaleString()}</p>
+					<p className="text-sm text-slate-600">
+						{new Date(run.createdAt).toLocaleString()} · Projekt: {projectName}
+					</p>
 				</div>
 				<button onClick={() => router.push('/runs')} className="text-sm text-slate-900 underline">
 					Tilbage

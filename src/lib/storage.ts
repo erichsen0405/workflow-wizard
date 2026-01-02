@@ -1,9 +1,13 @@
-import { FieldDef, Run, Template } from './models';
+import { FieldDef, Project, Run, Template } from './models';
 
-const STORAGE_KEYS = {
+export const STORAGE_KEYS = {
 	templates: 'ww_templates_v1',
 	runs: 'ww_runs_v1',
+	projects: 'ww_projects_v1',
+	activeProjectId: 'ww_active_project_v1',
 };
+
+export const ACTIVE_PROJECT_EVENT = 'ww:active-project-changed';
 
 const hasWindow = typeof window !== 'undefined';
 
@@ -18,11 +22,17 @@ const safeJSONParse = <T>(raw: string | null, fallback: T): T => {
 
 const getStore = () => (hasWindow ? window.localStorage : null);
 
-const generateId = () => {
+export const createLocalId = () => {
 	if (typeof crypto !== 'undefined' && crypto.randomUUID) {
 		return crypto.randomUUID();
 	}
 	return `id_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+};
+
+const notifyActiveProjectChange = () => {
+	if (hasWindow && typeof window.dispatchEvent === 'function') {
+		window.dispatchEvent(new Event(ACTIVE_PROJECT_EVENT));
+	}
 };
 
 const defaultField = (overrides: Partial<FieldDef>): FieldDef => ({
@@ -38,7 +48,8 @@ const createDefaultTemplates = (): Template[] => {
 	const timestamp = new Date().toISOString();
 	return [
 		{
-			id: generateId(),
+			id: createLocalId(),
+			category: 'bug',
 			name: 'Bug fix (standard)',
 			description: 'Standard bugfix prompt',
 			fields: [
@@ -78,7 +89,8 @@ Indsatte filer
 			updatedAt: timestamp,
 		},
 		{
-			id: generateId(),
+			id: createLocalId(),
+			category: 'feature',
 			name: 'Feature (standard)',
 			description: 'Feature prompt',
 			fields: [
@@ -105,7 +117,8 @@ Indsatte filer
 			updatedAt: timestamp,
 		},
 		{
-			id: generateId(),
+			id: createLocalId(),
+			category: 'enhancement',
 			name: 'Start ny prompt',
 			description: 'Blank prompt starter',
 			fields: [
@@ -157,6 +170,41 @@ export const saveRuns = (runs: Run[]) => {
 	const storage = getStore();
 	if (!storage) return;
 	storage.setItem(STORAGE_KEYS.runs, JSON.stringify(runs));
+};
+
+export const loadProjects = (): Project[] => {
+	const storage = getStore();
+	if (!storage) return [];
+	return safeJSONParse(storage.getItem(STORAGE_KEYS.projects), []);
+};
+
+export const saveProjects = (projects: Project[]) => {
+	const storage = getStore();
+	if (!storage) return;
+	storage.setItem(STORAGE_KEYS.projects, JSON.stringify(projects));
+};
+
+export const loadActiveProjectId = (): string | null => {
+	const storage = getStore();
+	if (!storage) return null;
+	return storage.getItem(STORAGE_KEYS.activeProjectId);
+};
+
+export const saveActiveProjectId = (projectId: string | null) => {
+	const storage = getStore();
+	if (!storage) return;
+	if (!projectId) {
+		storage.removeItem(STORAGE_KEYS.activeProjectId);
+	} else {
+		storage.setItem(STORAGE_KEYS.activeProjectId, projectId);
+	}
+	notifyActiveProjectChange();
+};
+
+export const getActiveProject = (): Project | null => {
+	const id = loadActiveProjectId();
+	if (!id) return null;
+	return loadProjects().find((project) => project.id === id) ?? null;
 };
 
 export const seedDefaultsIfEmpty = () => {

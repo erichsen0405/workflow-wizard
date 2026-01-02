@@ -2,17 +2,20 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Run, Template } from '@/lib/models';
-import { loadRuns, loadTemplates } from '@/lib/storage';
+import { Project, Run, Template } from '@/lib/models';
+import { loadProjects, loadRuns, loadTemplates } from '@/lib/storage';
 
 export default function RunsPage() {
 	const [runs, setRuns] = useState<Run[]>([]);
 	const [templates, setTemplates] = useState<Record<string, Template>>({});
+	const [projects, setProjects] = useState<Record<string, Project>>({});
 
 	useEffect(() => {
 		setRuns(loadRuns().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)));
 		const tmplLookup = Object.fromEntries(loadTemplates().map((t) => [t.id, t]));
+		const projectLookup = Object.fromEntries(loadProjects().map((p) => [p.id, p]));
 		setTemplates(tmplLookup);
+		setProjects(projectLookup);
 	}, []);
 
 	const copyOutput = async (text: string) => {
@@ -42,6 +45,10 @@ export default function RunsPage() {
 									<p className="text-sm text-slate-600">
 										Template: {templates[run.templateId]?.name ?? 'Ukendt'} ·{' '}
 										{new Date(run.createdAt).toLocaleString()}
+									</p>
+									<p className="text-xs text-slate-500">
+										Projekt:{' '}
+										{run.projectId ? projects[run.projectId]?.name ?? 'Slettet projekt' : 'Ingen valgt'}
 									</p>
 								</div>
 								<div className="flex gap-2 text-sm">

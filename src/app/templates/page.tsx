@@ -13,6 +13,7 @@ const newTemplate = (): Template => {
 		description: '',
 		fields: [],
 		body: '',
+		category: undefined,
 		createdAt: timestamp,
 		updatedAt: timestamp,
 	};
@@ -169,6 +170,25 @@ export default function TemplatesPage() {
 								className="mt-1 w-full rounded border p-2"
 								rows={8}
 							/>
+						</label>
+						<label className="block text-sm font-semibold">
+							Category
+							<select
+								value={draft.category ?? ''}
+								onChange={(e) =>
+									setDraft({
+										...draft,
+										category: (e.target.value || undefined) as Template['category'],
+									})
+								}
+								className="mt-1 w-full rounded border p-2"
+							>
+								<option value="">Ingen</option>
+								<option value="bug">Bug</option>
+								<option value="feature">Feature</option>
+								<option value="enhancement">Enhancement</option>
+								<option value="ui">UI</option>
+							</select>
 						</label>
 
 						<div className="space-y-2">

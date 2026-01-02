@@ -1,4 +1,5 @@
 export type FieldType = 'text' | 'textarea' | 'select';
+export type TemplateCategory = 'bug' | 'feature' | 'enhancement' | 'ui';
 
 export interface FieldDef {
 	key: string;
@@ -8,18 +9,27 @@ export interface FieldDef {
 	options?: string[];
 }
 
+export interface Project {
+	id: string;
+	name: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
 export interface Template {
 	id: string;
 	name: string;
 	description: string;
 	fields: FieldDef[];
 	body: string;
+	category?: TemplateCategory;
 	createdAt: string;
 	updatedAt: string;
 }
 
 export interface Run {
 	id: string;
+	projectId: string;
 	templateId: string;
 	title: string;
 	values: Record<string, string>;
