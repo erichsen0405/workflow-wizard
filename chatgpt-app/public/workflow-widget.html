@@ -60,6 +60,31 @@
 			flex-wrap: wrap;
 			gap: 0.5rem;
 		}
+		.project-section {
+			display: flex;
+			flex-direction: column;
+			gap: 0.25rem;
+		}
+		.project-controls {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.5rem;
+			align-items: center;
+		}
+		.project-controls select {
+			flex: 1 1 10rem;
+		}
+		.new-project {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.5rem;
+		}
+		.new-project input {
+			flex: 1 1 12rem;
+		}
+		.hidden {
+			display: none !important;
+		}
 		.status {
 			font-size: 0.8rem;
 			color: #059669;
@@ -68,9 +93,26 @@
 </head>
 <body>
 	<div class="container">
+		<div class="project-section">
+			<label>
+				Projekt
+				<div class="project-controls">
+					<select id="projectSelect">
+						<option value="">Vælg projekt</option>
+					</select>
+					<button id="createProjectBtn" type="button">Opret</button>
+					<button id="deleteProjectBtn" type="button" class="secondary" disabled>Slet</button>
+				</div>
+			</label>
+			<div id="newProjectForm" class="new-project hidden">
+				<input id="newProjectName" placeholder="Nyt projektnavn" />
+				<button id="saveProjectBtn" type="button">Gem projekt</button>
+			</div>
+		</div>
+
 		<label>
 			Project name (valgfrit)
-			<input id="projectName" placeholder="fx Workflow Wizard" />
+			<input id="projectName" placeholder="fx Workflow Wizard" readonly />
 		</label>
 
 		<label>
@@ -110,6 +152,16 @@
 			const pasteInput = document.getElementById('pastedText');
 			const outputArea = document.getElementById('output');
 			const statusEl = document.getElementById('status');
+			const projectSelect = document.getElementById('projectSelect');
+			const createProjectBtn = document.getElementById('createProjectBtn');
+			const deleteProjectBtn = document.getElementById('deleteProjectBtn');
+			const newProjectForm = document.getElementById('newProjectForm');
+			const newProjectInput = document.getElementById('newProjectName');
+			const saveProjectBtn = document.getElementById('saveProjectBtn');
+			const PROJECTS_KEY = 'copilotflow_projects_v1';
+			const ACTIVE_PROJECT_KEY = 'copilotflow_active_project_v1';
+			let projects = [];
+			let activeProjectId = null;
 			const checklist =
 				'✅ NÆSTE SKRIDT\n' +
 				'1. Indsæt ændrede filer til validering.\n' +
@@ -138,10 +190,170 @@
 				outputArea.value = text ?? '';
 			};
 
+			const safeReadJSON = (key, fallback) => {
+				try {
+					const raw = window.localStorage?.getItem?.(key);
+					if (!raw) return fallback;
+					return JSON.parse(raw);
+				} catch (error) {
+					console.warn('Storage read failed', error);
+					return fallback;
+				}
+			};
+
+			const safeWriteJSON = (key, value) => {
+				try {
+					window.localStorage?.setItem?.(key, JSON.stringify(value));
+				} catch (error) {
+					console.warn('Storage write failed', error);
+				}
+			};
+
+			const loadProjects = () => safeReadJSON(PROJECTS_KEY, []);
+			const saveProjects = (nextProjects) => safeWriteJSON(PROJECTS_KEY, nextProjects);
+
+			const loadActiveProjectId = () => {
+				try {
+					return window.localStorage?.getItem?.(ACTIVE_PROJECT_KEY) ?? null;
+				} catch (error) {
+					console.warn('Active project read failed', error);
+					return null;
+				}
+			};
+
+			const saveActiveProjectId = (id) => {
+				try {
+					const storage = window.localStorage;
+					if (!storage) return;
+					if (id) {
+						storage.setItem(ACTIVE_PROJECT_KEY, id);
+					} else {
+						storage.removeItem(ACTIVE_PROJECT_KEY);
+					}
+				} catch (error) {
+					console.warn('Active project write failed', error);
+				}
+			};
+
+			const generateProjectId = () => {
+				if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+				return `proj-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+			};
+
+			const getActiveProject = () => projects.find((project) => project.id === activeProjectId) ?? null;
+
+			const syncProjectNameField = () => {
+				const activeProject = getActiveProject();
+				projectInput.value = activeProject?.name ?? '';
+				projectInput.placeholder = activeProject ? '' : 'Vælg eller opret et projekt';
+			};
+
+			const renderProjectsUI = () => {
+				projectSelect.innerHTML = '';
+				const placeholderOption = document.createElement('option');
+				placeholderOption.value = '';
+				placeholderOption.textContent = 'Vælg projekt';
+				projectSelect.appendChild(placeholderOption);
+				projects.forEach((project) => {
+					const option = document.createElement('option');
+					option.value = project.id;
+					option.textContent = project.name;
+					projectSelect.appendChild(option);
+				});
+				projectSelect.value = activeProjectId ?? '';
+				deleteProjectBtn.disabled = !activeProjectId;
+				syncProjectNameField();
+			};
+
+			const setActiveProject = (id) => {
+				if (id && projects.some((project) => project.id === id)) {
+					activeProjectId = id;
+				} else {
+					activeProjectId = null;
+				}
+				saveActiveProjectId(activeProjectId);
+				renderProjectsUI();
+			};
+
+			const toggleNewProjectForm = (shouldShow) => {
+				if (shouldShow) {
+					newProjectForm.classList.remove('hidden');
+					newProjectInput.focus();
+				} else {
+					newProjectForm.classList.add('hidden');
+					newProjectInput.value = '';
+				}
+			};
+
+			const handleSaveProject = () => {
+				const name = newProjectInput.value.trim();
+				if (!name) {
+					setStatus('Angiv projektnavn', true);
+					newProjectInput.focus();
+					return;
+				}
+				const newProject = {
+					id: generateProjectId(),
+					name,
+					createdAt: new Date().toISOString(),
+				};
+				projects = [...projects, newProject];
+				saveProjects(projects);
+				setActiveProject(newProject.id);
+				toggleNewProjectForm(false);
+				setStatus('Projekt oprettet');
+			};
+
+			const handleDeleteProject = () => {
+				const activeProject = getActiveProject();
+				if (!activeProject) return;
+				const confirmed = window.confirm(`Slet projekt "${activeProject.name}"?`);
+				if (!confirmed) return;
+				projects = projects.filter((project) => project.id !== activeProject.id);
+				saveProjects(projects);
+				if (activeProjectId === activeProject.id) {
+					setActiveProject(null);
+				} else {
+					renderProjectsUI();
+				}
+				setStatus('Projekt slettet');
+			};
+
+			const initializeProjects = () => {
+				projects = loadProjects();
+				activeProjectId = loadActiveProjectId();
+				if (!projects.some((project) => project.id === activeProjectId)) {
+					activeProjectId = null;
+					saveActiveProjectId(null);
+				}
+				renderProjectsUI();
+			};
+
+			initializeProjects();
+
+			createProjectBtn.addEventListener('click', () => {
+				const shouldShow = newProjectForm.classList.contains('hidden');
+				toggleNewProjectForm(shouldShow);
+			});
+
+			saveProjectBtn.addEventListener('click', handleSaveProject);
+
+			newProjectInput.addEventListener('keydown', (event) => {
+				if (event.key === 'Enter') {
+					event.preventDefault();
+					handleSaveProject();
+				}
+			});
+
+			deleteProjectBtn.addEventListener('click', handleDeleteProject);
+
+			projectSelect.addEventListener('change', (event) => {
+				setActiveProject(event.target.value || null);
+			});
+
 			const hydrateFromToolOutput = (toolOutput) => {
 				if (!toolOutput) return;
 				if (toolOutput.kind) kindSelect.value = toolOutput.kind;
-				if (toolOutput.projectName) projectInput.value = toolOutput.projectName;
 				if (typeof toolOutput.outputText === 'string') {
 					updateOutput(toolOutput.outputText);
 				}
@@ -176,11 +388,15 @@
 				return lines.join('\n');
 			};
 
-			const buildPayload = () => ({
-				kind: kindSelect.value,
-				pastedText: pasteInput.value,
-				projectName: projectInput.value.trim() || undefined,
-			});
+			const buildPayload = () => {
+				const activeProject = getActiveProject();
+				if (!activeProject) return null;
+				return {
+					kind: kindSelect.value,
+					pastedText: pasteInput.value,
+					projectName: activeProject.name,
+				};
+			};
 
 			const generateLocally = (payload, { skipStatus = false } = {}) => {
 				const kind = payload?.kind ?? kindSelect.value;
@@ -221,7 +437,11 @@
 
 			document.getElementById('generateBtn').addEventListener('click', async () => {
 				const payload = buildPayload();
- 				let skipLocalStatus = false;
+				if (!payload) {
+					setStatus('Vælg eller opret et projekt først', true);
+					return;
+				}
+				let skipLocalStatus = false;
 
 				if (window.openai?.callTool) {
 					try {

@@ -65,11 +65,16 @@ function createWizardServer() {
 		},
 	);
 
+	const wizardToolHandler = async () => ({
+		content: [{ type: 'text', text: 'Wizard opened.' }],
+		structuredContent: { outputText: '', kind: 'feature', lastError: '' },
+	});
+
 	server.registerTool(
 		'open_wizard',
 		{
-			title: 'Open workflow wizard',
-			description: 'Open the embedded workflow wizard widget.',
+			title: 'Open workflow wizard (start ny prompt)',
+			description: 'Open the embedded workflow wizard widget – brug når brugeren skriver "start ny prompt".',
 			inputSchema: {},
 			_meta: {
 				'openai/widgetAccessible': true,
@@ -78,10 +83,23 @@ function createWizardServer() {
 				'openai/toolInvocation/invoked': 'Wizard opened',
 			},
 		},
-		async () => ({
-			content: [{ type: 'text', text: 'Wizard opened.' }],
-			structuredContent: { outputText: '', kind: 'feature', lastError: '' },
-		}),
+		wizardToolHandler,
+	);
+
+	server.registerTool(
+		'start_ny_prompt',
+		{
+			title: 'Start ny prompt',
+			description: 'Åbner workflow wizard (alias). Brug når brugeren skriver "start ny prompt".',
+			inputSchema: {},
+			_meta: {
+				'openai/widgetAccessible': true,
+				'openai/outputTemplate': 'ui://widget/workflow.html',
+				'openai/toolInvocation/invoking': 'Opening wizard',
+				'openai/toolInvocation/invoked': 'Wizard opened',
+			},
+		},
+		wizardToolHandler,
 	);
 
 	const generatePromptInputSchema = {
