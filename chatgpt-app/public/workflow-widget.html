@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+	<meta charset="utf-8" />
+	<title>Workflow Wizard Widget</title>
+	<meta name="viewport" content="width=device-width,initial-scale=1" />
+	<style>
+		:root {
+			font-family: 'Segoe UI', system-ui, sans-serif;
+			background: #f8fafc;
+			color: #0f172a;
+		}
+		body {
+			margin: 0;
+			padding: 1rem;
+		}
+		.container {
+			display: flex;
+			flex-direction: column;
+			gap: 0.75rem;
+		}
+		label {
+			font-size: 0.85rem;
+			font-weight: 600;
+			display: flex;
+			flex-direction: column;
+			gap: 0.25rem;
+		}
+		input, select, textarea, button {
+			font: inherit;
+		}
+		input, select, textarea {
+			padding: 0.5rem;
+			border: 1px solid #cbd5f5;
+			border-radius: 0.5rem;
+			background: #fff;
+		}
+		textarea {
+			min-height: 5rem;
+			resize: vertical;
+		}
+		button {
+			border: none;
+			border-radius: 0.5rem;
+			padding: 0.6rem 1rem;
+			background: #0f172a;
+			color: #fff;
+			font-weight: 600;
+			cursor: pointer;
+		}
+		button.secondary {
+			background: #475569;
+		}
+		button:disabled {
+			opacity: 0.6;
+			cursor: not-allowed;
+		}
+		.actions {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.5rem;
+		}
+		.status {
+			font-size: 0.8rem;
+			color: #059669;
+		}
+	</style>
+</head>
+<body>
+	<div class="container">
+		<label>
+			Project name (valgfrit)
+			<input id="projectName" placeholder="fx Workflow Wizard" />
+		</label>
+
+		<label>
+			Type
+			<select id="kind">
+				<option value="bug">Bug</option>
+				<option value="feature" selected>Feature</option>
+				<option value="enhancement">Enhancement</option>
+				<option value="ui">UI design update</option>
+			</select>
+		</label>
+
+		<label>
+			Paste specs
+			<textarea id="pastedText" placeholder="Indsæt din beskrivelse her..."></textarea>
+		</label>
+
+		<button id="generateBtn">Generate</button>
+
+		<label>
+			Output
+			<textarea id="output" readonly></textarea>
+		</label>
+
+		<div class="actions">
+			<button id="copyBtn" type="button" class="secondary">Copy output</button>
+			<button id="followUpBtn" type="button" class="secondary">Copy output as message</button>
+		</div>
+
+		<div id="status" class="status"></div>
+	</div>
+
+	<script>
+		(() => {
+			const kindSelect = document.getElementById('kind');
+			const projectInput = document.getElementById('projectName');
+			const pasteInput = document.getElementById('pastedText');
+			const outputArea = document.getElementById('output');
+			const statusEl = document.getElementById('status');
+			const checklist =
+				'✅ NÆSTE SKRIDT\n' +
+				'1. Indsæt ændrede filer til validering.\n' +
+				'2. Kør lokale tests / build.\n' +
+				'3. Notér observationer & logs.\n' +
+				'4. Commit med passende besked.\n' +
+				'5. Del status og næste skridt.';
+
+			const headerLabels = {
+				bug: 'BUG PROMPT',
+				feature: 'FEATURE PROMPT',
+				enhancement: 'ENHANCEMENT PROMPT',
+				ui: 'UI DESIGN PROMPT',
+			};
+
+			const setStatus = (text, isError = false) => {
+				statusEl.textContent = text;
+				statusEl.style.color = isError ? '#dc2626' : '#059669';
+				if (!text) return;
+				setTimeout(() => {
+					if (statusEl.textContent === text) statusEl.textContent = '';
+				}, 4000);
+			};
+
+			const updateOutput = (text) => {
+				outputArea.value = text ?? '';
+			};
+
+			const readGlobals = (globals) => {
+				if (!globals) return;
+				const toolOutput = globals.toolOutput ?? {};
+				if (toolOutput.kind) kindSelect.value = toolOutput.kind;
+				if (toolOutput.projectName) projectInput.value = toolOutput.projectName;
+				if (typeof toolOutput.outputText === 'string') {
+					updateOutput(toolOutput.outputText);
+				}
+			};
+
+			if (window.openai?.toolOutput) {
+				readGlobals({ toolOutput: window.openai.toolOutput });
+			}
+
+			window.addEventListener('openai:set_globals', (event) => {
+				readGlobals(event.detail);
+			});
+
+			const formatOutput = (kind, projectName, pastedText) => {
+				const lines = [headerLabels[kind] ?? 'PROMPT'];
+				if (projectName) lines.push(`Projekt: ${projectName}`);
+				if (pastedText?.trim()) {
+					lines.push('\nINPUT:');
+					lines.push(pastedText.trim());
+				}
+				lines.push('\n' + checklist);
+				return lines.join('\n');
+			};
+
+			const generateLocally = () => {
+				const kind = kindSelect.value;
+				const projectName = projectInput.value.trim();
+				const pastedText = pasteInput.value;
+				const outputText = formatOutput(kind, projectName, pastedText);
+				updateOutput(outputText);
+				setStatus('Lokalt output genereret');
+			};
+
+			document.getElementById('generateBtn').addEventListener('click', async () => {
+				const payload = {
+					kind: kindSelect.value,
+					pastedText: pasteInput.value,
+					projectName: projectInput.value.trim() || undefined,
+				};
+
+				if (window.openai?.callTool) {
+					try {
+						await window.openai.callTool('generate_prompt', payload);
+						setStatus('Prompt genereret via tool');
+						return;
+					} catch (error) {
+						console.error(error);
+						setStatus('Tool fejlede – bruger lokal fallback', true);
+					}
+				}
+
+				generateLocally();
+			});
+
+			const copyOutput = async () => {
+				const text = outputArea.value;
+				if (!text) {
+					setStatus('Intet output at kopiere', true);
+					return;
+				}
+				try {
+					if (navigator.clipboard?.writeText) {
+						await navigator.clipboard.writeText(text);
+					} else {
+						outputArea.select();
+						document.execCommand('copy');
+						outputArea.setSelectionRange(0, 0);
+					}
+					setStatus('Output kopieret');
+				} catch (error) {
+					console.error(error);
+					setStatus('Kunne ikke kopiere', true);
+				}
+			};
+
+			document.getElementById('copyBtn').addEventListener('click', copyOutput);
+
+			document.getElementById('followUpBtn').addEventListener('click', async () => {
+				const text = outputArea.value;
+				if (!text) {
+					setStatus('Intet output at sende', true);
+					return;
+				}
+				if (window.openai?.sendFollowUpMessage) {
+					try {
+						await window.openai.sendFollowUpMessage({ prompt: text });
+						setStatus('Output sendt som follow-up');
+					} catch (error) {
+						console.error(error);
+						setStatus('Kunne ikke sende follow-up', true);
+					}
+				} else {
+					await copyOutput();
+				}
+			});
+		})();
+	</script>
+</body>
+</html>
