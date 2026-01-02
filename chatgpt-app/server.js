@@ -8,8 +8,6 @@ import { z } from 'zod';
 const PORT = Number(process.env.PORT ?? 8787);
 const MCP_PATH = '/mcp';
 
-const widgetHtml = readFileSync(new URL('./public/workflow-widget.html', import.meta.url), 'utf8');
-
 const NEXT_STEPS = `✅ NÆSTE SKRIDT
 (1) Indsæt hele indholdet af de ændrede filer til validering (1:1 klar til overskrivning)
 (2) Kør tests: Web → \`npm run dev\` og test i browser
@@ -52,16 +50,19 @@ function createWizardServer() {
 		'workflow-widget',
 		'ui://widget/workflow.html',
 		{},
-		async () => ({
-			contents: [
-				{
-					uri: 'ui://widget/workflow.html',
-					mimeType: 'text/html+skybridge',
-					text: widgetHtml,
-					_meta: { 'openai/widgetPrefersBorder': true },
-				},
-			],
-		}),
+		async () => {
+			const widgetHtml = readFileSync(new URL('./public/workflow-widget.html', import.meta.url), 'utf8');
+			return {
+				contents: [
+					{
+						uri: 'ui://widget/workflow.html',
+						mimeType: 'text/html+skybridge',
+						text: widgetHtml,
+						_meta: { 'openai/widgetPrefersBorder': true },
+					},
+				],
+			};
+		},
 	);
 
 	server.registerTool(

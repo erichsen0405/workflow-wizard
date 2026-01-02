@@ -138,9 +138,8 @@
 				outputArea.value = text ?? '';
 			};
 
-			const readGlobals = (globals) => {
-				if (!globals) return;
-				const toolOutput = globals.toolOutput ?? {};
+			const hydrateFromToolOutput = (toolOutput) => {
+				if (!toolOutput) return;
 				if (toolOutput.kind) kindSelect.value = toolOutput.kind;
 				if (toolOutput.projectName) projectInput.value = toolOutput.projectName;
 				if (typeof toolOutput.outputText === 'string') {
@@ -148,12 +147,22 @@
 				}
 			};
 
+			const extractToolOutput = (detail) => {
+				if (!detail) return undefined;
+				return detail.globals?.toolOutput ?? detail.toolOutput;
+			};
+
 			if (window.openai?.toolOutput) {
-				readGlobals({ toolOutput: window.openai.toolOutput });
+				hydrateFromToolOutput(window.openai.toolOutput);
 			}
 
 			window.addEventListener('openai:set_globals', (event) => {
-				readGlobals(event.detail);
+				const globalsToolOutput = extractToolOutput(event.detail);
+				if (globalsToolOutput) {
+					window.openai = window.openai ?? {};
+					window.openai.toolOutput = globalsToolOutput;
+				}
+				hydrateFromToolOutput(globalsToolOutput);
 			});
 
 			const formatOutput = (kind, projectName, pastedText) => {
@@ -167,34 +176,65 @@
 				return lines.join('\n');
 			};
 
-			const generateLocally = () => {
-				const kind = kindSelect.value;
-				const projectName = projectInput.value.trim();
-				const pastedText = pasteInput.value;
+			const buildPayload = () => ({
+				kind: kindSelect.value,
+				pastedText: pasteInput.value,
+				projectName: projectInput.value.trim() || undefined,
+			});
+
+			const generateLocally = (payload, { skipStatus = false } = {}) => {
+				const kind = payload?.kind ?? kindSelect.value;
+				const projectNameRaw = payload?.projectName ?? projectInput.value;
+				const projectName = typeof projectNameRaw === 'string' ? projectNameRaw.trim() : '';
+				const pastedText = typeof payload?.pastedText === 'string' ? payload.pastedText : pasteInput.value;
 				const outputText = formatOutput(kind, projectName, pastedText);
 				updateOutput(outputText);
-				setStatus('Lokalt output genereret');
+				if (!skipStatus) {
+					setStatus('Lokalt output genereret');
+				}
+			};
+
+			const getOutputTextFromResponse = (response) => {
+				const directOutput =
+					response?.structuredContent?.outputText ??
+					response?.structured_content?.outputText ??
+					response?.toolOutput?.outputText;
+				if (typeof directOutput === 'string') {
+					return directOutput;
+				}
+				const latestGlobalOutput = window.openai?.toolOutput?.outputText;
+				return typeof latestGlobalOutput === 'string' ? latestGlobalOutput : undefined;
+			};
+
+			const handleToolGeneration = async (payload) => {
+				setStatus('Generating…');
+				const response = await window.openai.callTool('generate_prompt', payload);
+				const outputText = getOutputTextFromResponse(response);
+				if (typeof outputText === 'string') {
+					updateOutput(outputText);
+					setStatus('Done');
+					return;
+				}
+				setStatus('Ingen outputText – bruger fallback', true);
+				generateLocally(payload, { skipStatus: true });
 			};
 
 			document.getElementById('generateBtn').addEventListener('click', async () => {
-				const payload = {
-					kind: kindSelect.value,
-					pastedText: pasteInput.value,
-					projectName: projectInput.value.trim() || undefined,
-				};
+				const payload = buildPayload();
+ 				let skipLocalStatus = false;
 
 				if (window.openai?.callTool) {
 					try {
-						await window.openai.callTool('generate_prompt', payload);
-						setStatus('Prompt genereret via tool');
+						await handleToolGeneration(payload);
 						return;
 					} catch (error) {
 						console.error(error);
-						setStatus('Tool fejlede – bruger lokal fallback', true);
+						setStatus('Tool fejlede – fallback', true);
+						skipLocalStatus = true;
 					}
 				}
 
-				generateLocally();
+				generateLocally(payload, { skipStatus: skipLocalStatus });
 			});
 
 			const copyOutput = async () => {
@@ -226,9 +266,10 @@
 					setStatus('Intet output at sende', true);
 					return;
 				}
-				if (window.openai?.sendFollowUpMessage) {
+				const followUpSender = window.openai?.sendFollowUpMessage ?? window.openai?.sendFollowupMessage;
+				if (followUpSender) {
 					try {
-						await window.openai.sendFollowUpMessage({ prompt: text });
+						await followUpSender({ prompt: text });
 						setStatus('Output sendt som follow-up');
 					} catch (error) {
 						console.error(error);
