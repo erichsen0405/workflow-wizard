@@ -85,6 +85,34 @@
 		.hidden {
 			display: none !important;
 		}
+		.fields-section {
+			border: 1px solid #e2e8f0;
+			border-radius: 0.75rem;
+			padding: 0.75rem;
+			background: #fff;
+		}
+		.fields-header {
+			font-size: 0.85rem;
+			font-weight: 600;
+			margin-bottom: 0.5rem;
+		}
+		.fields-grid {
+			display: flex;
+			flex-direction: column;
+			gap: 0.5rem;
+		}
+		.field-item {
+			display: flex;
+			flex-direction: column;
+			gap: 0.35rem;
+		}
+		.field-item span {
+			font-size: 0.8rem;
+			color: #475569;
+		}
+		.field-item textarea {
+			min-height: 4rem;
+		}
 		.status {
 			font-size: 0.8rem;
 			color: #059669;
@@ -130,6 +158,13 @@
 			<textarea id="pastedText" placeholder="Indsæt din beskrivelse her..."></textarea>
 		</label>
 
+		<button id="parseBtn" type="button" class="secondary">Parse & udfyld</button>
+
+		<div class="fields-section">
+			<div class="fields-header">Felter</div>
+			<div id="fields" class="fields-grid"></div>
+		</div>
+
 		<button id="generateBtn">Generate</button>
 
 		<label>
@@ -152,6 +187,8 @@
 			const pasteInput = document.getElementById('pastedText');
 			const outputArea = document.getElementById('output');
 			const statusEl = document.getElementById('status');
+			const parseBtn = document.getElementById('parseBtn');
+			const fieldsContainer = document.getElementById('fields');
 			const projectSelect = document.getElementById('projectSelect');
 			const createProjectBtn = document.getElementById('createProjectBtn');
 			const deleteProjectBtn = document.getElementById('deleteProjectBtn');
@@ -160,6 +197,55 @@
 			const saveProjectBtn = document.getElementById('saveProjectBtn');
 			const PROJECTS_KEY = 'copilotflow_projects_v1';
 			const ACTIVE_PROJECT_KEY = 'copilotflow_active_project_v1';
+			const fieldDefinitions = {
+				bug: [
+					{ key: 'bugId', label: 'Bug ID', type: 'text' },
+					{ key: 'title', label: 'Titel', type: 'text' },
+					{ key: 'goal', label: 'Mål', type: 'textarea' },
+					{ key: 'repro', label: 'Repro', type: 'textarea' },
+					{ key: 'expected', label: 'Forventet', type: 'textarea' },
+					{ key: 'actual', label: 'Faktisk', type: 'textarea' },
+					{ key: 'scope', label: 'Scope', type: 'textarea' },
+					{ key: 'constraints', label: 'Constraints', type: 'textarea' },
+					{ key: 'filesInserted', label: 'Indsatte filer', type: 'textarea' },
+				],
+				feature: [
+					{ key: 'featureId', label: 'Feature ID', type: 'text' },
+					{ key: 'title', label: 'Titel', type: 'text' },
+					{ key: 'goal', label: 'Mål', type: 'textarea' },
+					{ key: 'scope', label: 'Scope', type: 'textarea' },
+					{ key: 'constraints', label: 'Constraints', type: 'textarea' },
+					{ key: 'filesInserted', label: 'Indsatte filer', type: 'textarea' },
+				],
+				enhancement: [
+					{ key: 'featureId', label: 'Feature ID', type: 'text' },
+					{ key: 'title', label: 'Titel', type: 'text' },
+					{ key: 'goal', label: 'Mål', type: 'textarea' },
+					{ key: 'scope', label: 'Scope', type: 'textarea' },
+					{ key: 'constraints', label: 'Constraints', type: 'textarea' },
+					{ key: 'filesInserted', label: 'Indsatte filer', type: 'textarea' },
+				],
+				ui: [
+					{ key: 'featureId', label: 'UI / Feature ID', type: 'text' },
+					{ key: 'title', label: 'Titel', type: 'text' },
+					{ key: 'goal', label: 'Mål', type: 'textarea' },
+					{ key: 'scope', label: 'Scope', type: 'textarea' },
+					{ key: 'constraints', label: 'Constraints', type: 'textarea' },
+					{ key: 'filesInserted', label: 'Indsatte filer', type: 'textarea' },
+					{ key: 'designNotes', label: 'Design notes', type: 'textarea' },
+				],
+			};
+			const sectionLabels = {
+				goal: ['Mål', 'Goal', 'Objective'],
+				repro: ['Repro', 'Reproduktion', 'Steps to reproduce'],
+				expected: ['Forventet', 'Expected'],
+				actual: ['Faktisk', 'Actual'],
+				scope: ['Scope'],
+				constraints: ['Constraints', 'Krav', 'Begrænsninger'],
+				filesInserted: ['Filer', 'Files', 'Affected files', 'Indsatte filer'],
+				designNotes: ['Design', 'UI', 'Mock', 'Design notes'],
+			};
+			const values = {};
 			let projects = [];
 			let activeProjectId = null;
 			const checklist =
@@ -189,6 +275,110 @@
 			const updateOutput = (text) => {
 				outputArea.value = text ?? '';
 			};
+
+			const getFieldDefs = (kind) => fieldDefinitions[kind] ?? [];
+
+			const renderFields = (kind) => {
+				const defs = getFieldDefs(kind);
+				const allowedKeys = new Set(defs.map((def) => def.key));
+				Object.keys(values).forEach((key) => {
+					if (!allowedKeys.has(key)) delete values[key];
+				});
+				defs.forEach((def) => {
+					if (!(def.key in values)) values[def.key] = '';
+				});
+				fieldsContainer.innerHTML = '';
+				defs.forEach((def) => {
+					const wrapper = document.createElement('label');
+					wrapper.className = 'field-item';
+					const span = document.createElement('span');
+					span.textContent = def.label;
+					const control = def.type === 'textarea' ? document.createElement('textarea') : document.createElement('input');
+					if (def.type !== 'textarea') control.type = 'text';
+					control.value = values[def.key] ?? '';
+					control.addEventListener('input', (event) => {
+						values[def.key] = event.target.value;
+					});
+					wrapper.appendChild(span);
+					wrapper.appendChild(control);
+					fieldsContainer.appendChild(wrapper);
+				});
+			};
+
+			const trimValue = (value) => (value ?? '').toString().trim();
+
+			const getTrimmedValues = () => {
+				const entries = Object.entries(values)
+					.map(([key, value]) => [key, trimValue(value)])
+					.filter(([, val]) => val.length > 0);
+				return Object.fromEntries(entries);
+			};
+
+			const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+			const parsePasted = (kind, text) => {
+				const defs = getFieldDefs(kind);
+				const allowedKeys = new Set(defs.map((def) => def.key));
+				const result = {};
+				if (!text || !text.trim()) return result;
+				const lines = text.split(/\r?\n/);
+				const firstLine = lines[0]?.trim();
+				const idKey = kind === 'bug' ? 'bugId' : 'featureId';
+				if (firstLine && allowedKeys.has(idKey)) {
+					const idMatch = firstLine.match(/^([A-Za-z]+-\d+)\s*[:\-–]\s*(.+)$/);
+					if (idMatch) {
+						result[idKey] = idMatch[1].trim();
+						const title = idMatch[2]?.trim();
+						if (title && allowedKeys.has('title')) {
+							result.title = title;
+						}
+					}
+				}
+
+				const sectionMatchers = Object.entries(sectionLabels)
+					.filter(([key]) => allowedKeys.has(key))
+					.map(([key, labels]) => ({
+						key,
+						patterns: labels.map((label) => new RegExp(`^${escapeRegex(label)}\\s*[:：\\-–—]?\\s*(.*)$`, 'i')),
+					}));
+
+				const flush = (key, buffer) => {
+					if (key && buffer.length) {
+						const textValue = buffer.join('\n').trim();
+						if (textValue) result[key] = textValue;
+					}
+				};
+
+				let currentKey = null;
+				let buffer = [];
+
+				for (const rawLine of lines) {
+					const line = rawLine.trimEnd();
+					let matched = false;
+					for (const matcher of sectionMatchers) {
+						for (const pattern of matcher.patterns) {
+							const match = line.match(pattern);
+							if (!match) continue;
+							flush(currentKey, buffer);
+							currentKey = matcher.key;
+							buffer = [];
+							const immediate = (match[1] ?? '').trim();
+							if (immediate) buffer.push(immediate);
+							matched = true;
+							break;
+						}
+						if (matched) break;
+					}
+					if (!matched && currentKey) {
+						buffer.push(line);
+					}
+				}
+
+				flush(currentKey, buffer);
+				return result;
+			};
+
+			renderFields(kindSelect.value);
 
 			const safeReadJSON = (key, fallback) => {
 				try {
@@ -351,11 +541,45 @@
 				setActiveProject(event.target.value || null);
 			});
 
+			kindSelect.addEventListener('change', () => {
+				renderFields(kindSelect.value);
+			});
+
+			parseBtn.addEventListener('click', () => {
+				const text = pasteInput.value;
+				if (!text.trim()) {
+					setStatus('Indsæt specs først', true);
+					return;
+				}
+				const parsed = parsePasted(kindSelect.value, text);
+				let applied = false;
+				Object.entries(parsed).forEach(([key, value]) => {
+					const trimmedValue = (value ?? '').trim();
+					if (trimmedValue) {
+						values[key] = trimmedValue;
+						applied = true;
+					}
+				});
+				renderFields(kindSelect.value);
+				if (applied) {
+					setStatus('Felter udfyldt – tjek og ret hvis nødvendigt');
+				} else {
+					setStatus('Kunne ikke parse felter', true);
+				}
+			});
+
 			const hydrateFromToolOutput = (toolOutput) => {
 				if (!toolOutput) return;
-				if (toolOutput.kind) kindSelect.value = toolOutput.kind;
+				let kindChanged = false;
+				if (toolOutput.kind && kindSelect.value !== toolOutput.kind) {
+					kindSelect.value = toolOutput.kind;
+					kindChanged = true;
+				}
 				if (typeof toolOutput.outputText === 'string') {
 					updateOutput(toolOutput.outputText);
+				}
+				if (kindChanged) {
+					renderFields(kindSelect.value);
 				}
 			};
 
@@ -377,14 +601,83 @@
 				hydrateFromToolOutput(globalsToolOutput);
 			});
 
-			const formatOutput = (kind, projectName, pastedText) => {
+			const hasStructuredValues = (record) =>
+				Object.values(record ?? {}).some((value) => trimValue(value).length > 0);
+
+			const buildStructuredOutputSections = (kind, structuredValues) => {
+				if (!hasStructuredValues(structuredValues)) return [];
+				const get = (key) => trimValue(structuredValues?.[key]);
+				const sections = [];
+				if (kind === 'bug') {
+					const bugId = get('bugId');
+					const title = get('title');
+					if (bugId && title) {
+						sections.push(`Titel: ${bugId} – ${title}`);
+					} else if (title) {
+						sections.push(`Titel: ${title}`);
+					} else if (bugId) {
+						sections.push(`Titel: ${bugId}`);
+					}
+					const labelMap = {
+						goal: 'Mål',
+						repro: 'Repro',
+						expected: 'Forventet',
+						actual: 'Faktisk',
+						scope: 'Scope',
+						constraints: 'Constraints',
+						filesInserted: 'Indsatte filer',
+					};
+					['goal', 'repro', 'expected', 'actual', 'scope', 'constraints', 'filesInserted'].forEach((key) => {
+						const value = get(key);
+						if (value) sections.push(`${labelMap[key]}: ${value}`);
+					});
+					return sections;
+				}
+
+				const addCommonSections = (keys, labels) => {
+					keys.forEach((key, index) => {
+						const value = get(key);
+						if (value) sections.push(`${labels[index]}: ${value}`);
+					});
+				};
+
+				if (kind === 'feature' || kind === 'enhancement') {
+					const featureId = get('featureId');
+					if (featureId) sections.push(`Feature: ${featureId}`);
+					const title = get('title');
+					if (title) sections.push(`Titel: ${title}`);
+					addCommonSections(
+						['goal', 'scope', 'constraints', 'filesInserted'],
+						['Mål', 'Scope', 'Constraints', 'Indsatte filer'],
+					);
+					return sections;
+				}
+
+				if (kind === 'ui') {
+					const featureId = get('featureId');
+					if (featureId) sections.push(`UI update: ${featureId}`);
+					const title = get('title');
+					if (title) sections.push(`Titel: ${title}`);
+					addCommonSections(
+						['goal', 'scope', 'constraints', 'filesInserted', 'designNotes'],
+						['Mål', 'Scope', 'Constraints', 'Indsatte filer', 'Design notes'],
+					);
+					return sections;
+				}
+
+				return sections;
+			};
+
+			const formatOutput = (kind, projectName, pastedText, structuredValues = {}) => {
 				const lines = [headerLabels[kind] ?? 'PROMPT'];
 				if (projectName) lines.push(`Projekt: ${projectName}`);
-				if (pastedText?.trim()) {
-					lines.push('\nINPUT:');
-					lines.push(pastedText.trim());
+				const structuredSections = buildStructuredOutputSections(kind, structuredValues);
+				if (structuredSections.length) {
+					lines.push('', ...structuredSections, '', checklist);
+					return lines.join('\n');
 				}
-				lines.push('\n' + checklist);
+				const fallbackInput = trimValue(pastedText) || '(ingen input)';
+				lines.push('', 'INPUT:', fallbackInput, '', checklist);
 				return lines.join('\n');
 			};
 
@@ -395,6 +688,7 @@
 					kind: kindSelect.value,
 					pastedText: pasteInput.value,
 					projectName: activeProject.name,
+					values: getTrimmedValues(),
 				};
 			};
 
@@ -403,7 +697,7 @@
 				const projectNameRaw = payload?.projectName ?? projectInput.value;
 				const projectName = typeof projectNameRaw === 'string' ? projectNameRaw.trim() : '';
 				const pastedText = typeof payload?.pastedText === 'string' ? payload.pastedText : pasteInput.value;
-				const outputText = formatOutput(kind, projectName, pastedText);
+				const outputText = formatOutput(kind, projectName, pastedText, payload?.values ?? getTrimmedValues());
 				updateOutput(outputText);
 				if (!skipStatus) {
 					setStatus('Lokalt output genereret');
@@ -439,6 +733,11 @@
 				const payload = buildPayload();
 				if (!payload) {
 					setStatus('Vælg eller opret et projekt først', true);
+					return;
+				}
+				const hasValues = hasStructuredValues(payload.values);
+				if (!hasValues && !trimValue(payload.pastedText)) {
+					setStatus('Indsæt tekst eller udfyld felter', true);
 					return;
 				}
 				let skipLocalStatus = false;

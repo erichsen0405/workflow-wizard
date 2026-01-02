@@ -17,7 +17,82 @@ const NEXT_STEPS = `✅ NÆSTE SKRIDT
 (6) Skriv “bug/feature løst” når det er færdigt
 `;
 
-function buildPrompt({ kind, projectName, pastedText }) {
+function hasStructuredValues(values) {
+	if (!values) return false;
+	return Object.values(values).some((value) => (value ?? '').toString().trim().length > 0);
+}
+
+function formatLine(label, value) {
+	const trimmed = (value ?? '').toString().trim();
+	return trimmed ? `${label}: ${trimmed}` : null;
+}
+
+function collectStructuredSections(kind, values) {
+	if (!hasStructuredValues(values)) return [];
+	const get = (key) => (values?.[key] ?? '').toString().trim();
+	const sections = [];
+
+	if (kind === 'bug') {
+		const bugId = get('bugId');
+		const title = get('title');
+		if (bugId && title) {
+			sections.push(`Titel: ${bugId} – ${title}`);
+		} else if (title) {
+			sections.push(`Titel: ${title}`);
+		} else if (bugId) {
+			sections.push(`Titel: ${bugId}`);
+		}
+		const labelMap = {
+			goal: 'Mål',
+			repro: 'Repro',
+			expected: 'Forventet',
+			actual: 'Faktisk',
+			scope: 'Scope',
+			constraints: 'Constraints',
+			filesInserted: 'Indsatte filer',
+		};
+		['goal', 'repro', 'expected', 'actual', 'scope', 'constraints', 'filesInserted'].forEach((key) => {
+			const line = formatLine(labelMap[key], get(key));
+			if (line) sections.push(line);
+		});
+		return sections;
+	}
+
+	const commonSections = (keys, labels) => {
+		keys.forEach((key, idx) => {
+			const line = formatLine(labels[idx], get(key));
+			if (line) sections.push(line);
+		});
+	};
+
+	if (kind === 'feature' || kind === 'enhancement') {
+		const featureId = get('featureId');
+		if (featureId) sections.push(`Feature: ${featureId}`);
+		const titleLine = formatLine('Titel', get('title'));
+		if (titleLine) sections.push(titleLine);
+		commonSections(
+			['goal', 'scope', 'constraints', 'filesInserted'],
+			['Mål', 'Scope', 'Constraints', 'Indsatte filer'],
+		);
+		return sections;
+	}
+
+	if (kind === 'ui') {
+		const featureId = get('featureId');
+		if (featureId) sections.push(`UI update: ${featureId}`);
+		const titleLine = formatLine('Titel', get('title'));
+		if (titleLine) sections.push(titleLine);
+		commonSections(
+			['goal', 'scope', 'constraints', 'filesInserted', 'designNotes'],
+			['Mål', 'Scope', 'Constraints', 'Indsatte filer', 'Design notes'],
+		);
+		return sections;
+	}
+
+	return sections;
+}
+
+function buildPrompt({ kind, projectName, pastedText, values }) {
 	const kindTitle =
 		kind === 'bug'
 			? 'BUG PROMPT'
@@ -29,6 +104,20 @@ function buildPrompt({ kind, projectName, pastedText }) {
 
 	const proj = (projectName ?? '').trim();
 	const input = (pastedText ?? '').trim();
+
+	const structuredSections = collectStructuredSections(kind, values);
+	if (structuredSections.length > 0) {
+		return [
+			kindTitle,
+			proj ? `Projekt: ${proj}` : null,
+			'',
+			...structuredSections,
+			'',
+			NEXT_STEPS.trimEnd(),
+		]
+			.filter((line) => line !== null && line !== undefined)
+			.join('\n');
+	}
 
 	return [
 		kindTitle,
@@ -106,6 +195,7 @@ function createWizardServer() {
 		kind: z.enum(['bug', 'feature', 'enhancement', 'ui']),
 		pastedText: z.string().optional(),
 		projectName: z.string().optional(),
+		values: z.record(z.string()).optional(),
 	};
 
 	server.registerTool(
@@ -127,6 +217,7 @@ function createWizardServer() {
 				kind,
 				projectName: args?.projectName,
 				pastedText: args?.pastedText,
+				values: args?.values,
 			});
 
 			return {
