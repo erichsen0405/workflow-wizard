@@ -13,6 +13,7 @@ const WIDGET_URI = 'ui://widget/workflow.html';
 // --------- Schemas ----------
 const GeneratePromptSchema = z.object({
   projectName: z.string().optional(),
+  chatgptProjectName: z.string().optional(),
   kind: z.enum(['bug', 'feature', 'enhancement', 'ui']).optional(),
   pastedText: z.string().optional(),
   systemType: z.enum(['Base44', 'Natively']).optional(),
@@ -78,6 +79,7 @@ function buildBrief(args) {
 function buildPrompt(args) {
   const kind = args.kind ?? 'feature';
   const projectName = (args.projectName ?? '').toString().trim();
+  const chatgptProjectName = (args.chatgptProjectName ?? '').toString().trim();
   const systemType = args.systemType ?? 'Natively';
   const appType = args.appType ?? 'web';
   const copilotModel = (args.copilotModel ?? 'GPT-5.1-Codex').toString().trim();
@@ -98,6 +100,7 @@ function buildPrompt(args) {
   return (
     `${kindTitle} – Copilot prompt (VS Code Copilot Chat / Edit mode)\n` +
     `Projekt: ${projectName}\n` +
+    (chatgptProjectName ? `ChatGPT Project: ${chatgptProjectName}\n` : '') +
     `System: ${systemType}\n` +
     `App-type: ${appType}\n` +
     `Copilot model: ${copilotModel}\n\n` +
@@ -128,7 +131,7 @@ function buildWidgetResourceContent() {
   return {
     type: 'resource_link',
     name: 'Workflow Wizard',
-    uri: 'ui://widget/workflow.html',
+    uri: WIDGET_URI,
     mimeType: 'text/html+skybridge',
     title: 'Workflow Wizard'
   };
@@ -140,7 +143,7 @@ function createWizardServer() {
 
   server.registerResource(
     'workflow-widget',
-    'ui://widget/workflow.html',
+    WIDGET_URI,
     {
       title: 'Workflow Wizard Widget',
       description: 'Interactive workflow wizard UI',
@@ -150,10 +153,10 @@ function createWizardServer() {
       const widgetHtml = loadWidgetHtml();
       const resolvedUri =
         typeof uri === 'string'
-          ? uri || 'ui://widget/workflow.html'
+          ? uri || WIDGET_URI
           : uri instanceof URL
             ? uri.href
-            : 'ui://widget/workflow.html';
+            : WIDGET_URI;
 
       return {
         contents: [
@@ -170,7 +173,7 @@ function createWizardServer() {
 
   const widgetToolMeta = {
     'openai/widgetAccessible': true,
-    'openai/outputTemplate': 'ui://widget/workflow.html',
+    'openai/outputTemplate': WIDGET_URI,
     'openai/toolInvocation/invoking': 'Opening wizard',
     'openai/toolInvocation/invoked': 'Wizard opened'
   };
@@ -203,7 +206,7 @@ function createWizardServer() {
       inputSchema: z.object({}),
       _meta: {
         'openai/widgetAccessible': true,
-        'openai/outputTemplate': 'ui://widget/workflow.html',
+        'openai/outputTemplate': WIDGET_URI,
         'openai/toolInvocation/invoking': 'Starting new prompt',
         'openai/toolInvocation/invoked': 'New prompt started'
       }
@@ -228,7 +231,7 @@ function createWizardServer() {
       inputSchema: GeneratePromptSchema,
       _meta: {
         'openai/widgetAccessible': true,
-        'openai/outputTemplate': 'ui://widget/workflow.html',
+        'openai/outputTemplate': WIDGET_URI,
         'openai/toolInvocation/invoking': 'Generating prompt',
         'openai/toolInvocation/invoked': 'Prompt generated'
       }

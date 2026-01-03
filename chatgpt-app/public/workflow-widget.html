@@ -22,6 +22,41 @@
       padding: 26px;
     }
     h1 { color: #4f46e5; margin-bottom: 10px; font-size: 26px; }
+    .banner {
+      background: #1e3a8a;
+      color: #e0f2fe;
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 18px;
+      position: relative;
+    }
+    .banner button {
+      background: rgba(255,255,255,0.15);
+      color: #e0f2fe;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      margin-top: 10px;
+      margin-right: 10px;
+    }
+    .banner button:hover { background: rgba(255,255,255,0.25); }
+    .banner-dismiss {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      background: transparent;
+      color: #bae6fd;
+      font-size: 18px;
+      line-height: 1;
+      padding: 0;
+    }
+    .banner-status {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #bbf7d0;
+    }
     .info-box {
       background: #fff3cd;
       border: 1px solid #ffc107;
@@ -115,6 +150,16 @@
 </head>
 <body>
   <div class="container">
+    <div id="projectsBanner" class="banner" style="display:none;">
+      <strong>ChatGPT Projects understøtter ikke Apps/Connectors endnu.</strong>
+      <div>Hvis wizard ikke kan åbnes i et Project: åbne wizard i en normal chat og kopier output ind i Project.</div>
+      <div class="button-group" style="margin-top:10px;">
+        <button id="copyWorkaroundBtn" type="button">Kopiér workaround</button>
+      </div>
+      <div id="bannerStatus" class="banner-status"></div>
+      <button id="dismissBannerBtn" class="banner-dismiss" type="button" aria-label="Luk banner">×</button>
+    </div>
+
     <h1>Workflow Wizard</h1>
 
     <div class="info-box">
@@ -138,6 +183,9 @@
 
       <label style="margin-top:12px;">Project name (auto)</label>
       <input id="projectName" type="text" readonly placeholder="Vælg eller opret et projekt" />
+
+      <label style="margin-top:12px;">ChatGPT Project name (valgfrit)</label>
+      <input id="chatgptProjectName" type="text" placeholder="fx GPT app – til kodning i VS" />
     </div>
 
     <!-- System / App -->
@@ -222,29 +270,32 @@
   <script>
     const PROJECTS_KEY = 'copilotflow_projects_v1';
     const ACTIVE_PROJECT_KEY = 'copilotflow_active_project_v1';
-
+    const PROJECT_BANNER_DISMISSED_KEY = 'copilotflow_projects_banner_dismissed_v1';
+    const PROJECT_NAME_KEY = 'copilotflow_chatgpt_project_name_v1';
     const SOLVED_NEXT_STEPS_TEXT =
       '✅ NÆSTE SKRIDT (LØST)\n' +
-      '1) Merge branch → main\n' +
-      '   - PR-flow: Opret PR på GitHub → Merge → Pull latest på main i VS Code.\n' +
-      '   - Lokal merge (terminal):\n' +
-      '     a) git checkout main\n' +
-      '     b) git pull\n' +
-      '     c) git merge <din-branch>\n' +
-      '     d) git push\n' +
-      '\n' +
-      '2) Slet branch\n' +
-      '   - Lokalt: git branch -d <din-branch>\n' +
-      '   - Remote: git push origin --delete <din-branch>\n' +
-      '\n' +
-      '3) Bekræft\n' +
-      '   - Kør tests igen lokalt og bekræft at main er grøn.\n';
+      '1) Merge til main:\n' +
+      '   git checkout main\n' +
+      '   git pull\n' +
+      '   git merge <din-branch>\n' +
+      '   git push\n' +
+      '2) Slet branch lokalt + remote:\n' +
+      '   git branch -d <din-branch>\n' +
+      '   git push origin --delete <din-branch>';
+    const WORKAROUND_TEXT =
+      'Hvis wizard ikke åbner i et ChatGPT Project: start en normal chat, kør Workflow Wizard der, og kopier prompt/output ind i Project-chatten.';
 
     const els = {
+      banner: document.getElementById('projectsBanner'),
+      copyWorkaroundBtn: document.getElementById('copyWorkaroundBtn'),
+      dismissBannerBtn: document.getElementById('dismissBannerBtn'),
+      bannerStatus: document.getElementById('bannerStatus'),
+
       projectSelect: document.getElementById('projectSelect'),
       createProjectBtn: document.getElementById('createProjectBtn'),
       deleteProjectBtn: document.getElementById('deleteProjectBtn'),
       projectName: document.getElementById('projectName'),
+      chatgptProjectName: document.getElementById('chatgptProjectName'),
 
       systemType: document.getElementById('systemType'),
       appType: document.getElementById('appType'),
@@ -269,14 +320,16 @@
       sendStatus: document.getElementById('sendStatus')
     };
 
-    // Holder på "normale" next steps fra generate_prompt, så vi kan toggle tilbage hvis status skifter.
-    let lastGeneratedNextStepsText = '';
-
     function showStatus(el, message, type='info') {
       el.textContent = message;
       el.className = `status ${type}`;
       el.style.display = 'block';
       setTimeout(() => { el.style.display = 'none'; }, 4500);
+    }
+
+    function showBannerStatus(message) {
+      els.bannerStatus.textContent = message;
+      setTimeout(() => { els.bannerStatus.textContent = ''; }, 3500);
     }
 
     function safeReadJSON(key, fallback) {
@@ -351,6 +404,27 @@
       }
       renderProjects();
     }
+
+    function initBanner() {
+      const dismissed = localStorage.getItem(PROJECT_BANNER_DISMISSED_KEY);
+      if (!dismissed) {
+        els.banner.style.display = 'block';
+      }
+    }
+
+    els.copyWorkaroundBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(WORKAROUND_TEXT);
+        showBannerStatus('Workaround kopieret til clipboard.');
+      } catch {
+        showBannerStatus('Kunne ikke kopiere – kopier teksten manuelt.');
+      }
+    });
+
+    els.dismissBannerBtn.addEventListener('click', () => {
+      els.banner.style.display = 'none';
+      try { localStorage.setItem(PROJECT_BANNER_DISMISSED_KEY, '1'); } catch {}
+    });
 
     els.createProjectBtn.addEventListener('click', () => {
       const name = prompt('Projektnavn (fx "Football Coach — Natively")');
@@ -428,9 +502,9 @@
         resp?.structuredContent,
         resp?.structured_content,
         resp?.toolOutput,
+        window?.openai?.toolOutput,
         resp?.result,
-        resp?.data,
-        window?.openai?.toolOutput
+        resp?.data
       ];
 
       for (const candidate of candidates) {
@@ -441,15 +515,20 @@
       return extractFromContentArray(resp?.content);
     }
 
-    function syncNextStepsWithStatus() {
-      if (els.issueStatus.value === 'solved') {
-        els.nextSteps.value = SOLVED_NEXT_STEPS_TEXT;
-      } else {
-        els.nextSteps.value = lastGeneratedNextStepsText || '';
+    function loadChatgptProjectName() {
+      try {
+        const value = localStorage.getItem(PROJECT_NAME_KEY) || '';
+        els.chatgptProjectName.value = value;
+      } catch {
+        els.chatgptProjectName.value = '';
       }
     }
 
-    els.issueStatus.addEventListener('change', syncNextStepsWithStatus);
+    els.chatgptProjectName.addEventListener('input', (e) => {
+      try {
+        localStorage.setItem(PROJECT_NAME_KEY, e.target.value);
+      } catch {}
+    });
 
     async function generatePrompt() {
       const ap = getActiveProject();
@@ -464,7 +543,8 @@
         appType: els.appType.value,
         copilotModel: els.copilotModel.value,
         kind: els.kindSelect.value,
-        pastedText: els.pastedText.value
+        pastedText: els.pastedText.value,
+        chatgptProjectName: els.chatgptProjectName.value.trim()
       };
 
       if (!payload.pastedText.trim()) {
@@ -488,15 +568,13 @@
         if (!structured) {
           const debugPayload = JSON.stringify(resp ?? {}, null, 2) || '';
           els.output.value = debugPayload.slice(0, 8000);
-          lastGeneratedNextStepsText = '';
-          syncNextStepsWithStatus();
+          els.nextSteps.value = '';
           showStatus(els.genStatus, 'Kunne ikke læse tool output – debug sat i output-feltet', 'error');
           return;
         }
 
         els.output.value = structured.outputText || '';
-        lastGeneratedNextStepsText = structured.nextStepsText || '';
-        syncNextStepsWithStatus();
+        els.nextSteps.value = structured.nextStepsText || '';
 
         showStatus(els.genStatus, '✅ Done', 'success');
       } catch (err) {
@@ -547,8 +625,9 @@
         return;
       }
 
-      // sørg for UI matcher status inden send
-      syncNextStepsWithStatus();
+      if (els.issueStatus.value === 'solved') {
+        els.nextSteps.value = SOLVED_NEXT_STEPS_TEXT;
+      }
 
       const followUp = buildFollowUpMessage();
 
@@ -583,18 +662,17 @@
       els.kindSelect.value = 'feature';
       els.pastedText.value = '';
       els.output.value = '';
-      lastGeneratedNextStepsText = '';
       els.nextSteps.value = '';
       els.copilotAnswer.value = '';
       els.changedFiles.value = '';
       els.issueStatus.value = 'not_solved';
-      syncNextStepsWithStatus();
       showStatus(els.sendStatus, 'Klar til næste issue (projekt/system/app-type beholdes)', 'success');
       els.pastedText.focus();
     });
 
     initProjects();
-    syncNextStepsWithStatus();
+    initBanner();
+    loadChatgptProjectName();
   </script>
 </body>
 </html>
