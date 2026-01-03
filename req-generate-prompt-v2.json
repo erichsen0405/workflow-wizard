@@ -1,0 +1,1 @@
+﻿{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"generate_prompt","arguments":{"taskName":"Wizard UI test","copilotMode":"edit","systemType":"Natively","pastedText":"Test: widget skal generere prompt og udfylde model automatisk."}}}

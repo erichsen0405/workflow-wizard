@@ -14,9 +14,11 @@ const WIDGET_URI = 'ui://widget/workflow.html';
 const GeneratePromptSchema = z.object({
   projectName: z.string().optional(),
   chatgptProjectName: z.string().optional(),
+  taskName: z.string().optional(),
   kind: z.enum(['bug', 'feature', 'enhancement', 'ui']).optional(),
   pastedText: z.string().optional(),
   systemType: z.enum(['Base44', 'Natively']).optional(),
+  copilotMode: z.enum(['agent', 'edit']).optional(),
   appType: z.enum(['web', 'react-native-expo', 'backend']).optional(),
   copilotModel: z.string().optional(),
 
@@ -31,26 +33,18 @@ const GeneratePromptSchema = z.object({
 });
 
 // --------- Prompt helpers ----------
-function getPreviewCommand(appType) {
-  if (appType === 'react-native-expo') return 'npx expo start -c --tunnel (åbn i Expo Go på iPhone)';
-  if (appType === 'backend') return 'Start server lokalt + test endpoints';
-  return 'npm run dev (åbn localhost i browser)';
-}
-
-function buildNextStepsBlock(appType) {
-  const preview = getPreviewCommand(appType);
+function buildNextStepsBlock() {
   return (
     '✅ NÆSTE SKRIDT\n' +
-    '1) Indsæt hele indholdet af de ændrede filer til validering (1:1):\n' +
-    '   - <FIL 1>\n' +
-    '   - <FIL 2>\n' +
-    '   - <FIL 3>\n' +
-    `2) Kør tests: ${preview}\n` +
-    '3) Rapportér tilbage: hvad du ser + logs/errors + evt. screenshots\n' +
-    '4) Commit:\n' +
-    '   - Commit message: <fx "fix: ..." eller "feat: ...">\n' +
-    '5) Når alt er grønt: skriv “bug/feature løst”\n'
+    '1) Indsæt hele indholdet af alle ændrede filer (1:1) i næste svar.\n' +
+    '2) Opsummer præcist hvad du har ændret og hvorfor.\n' +
+    '3) Vent på feedback og vær klar til flere iterationer – ingen test/QA endnu.\n'
   );
+}
+
+function selectCopilotModel(args) {
+  const provided = (args.copilotModel ?? '').toString().trim();
+  return provided || 'GPT-5.1-Codex';
 }
 
 function buildBrief(args) {
@@ -76,51 +70,45 @@ function buildBrief(args) {
   return pasted || '(ingen input)';
 }
 
-function buildPrompt(args) {
-  const kind = args.kind ?? 'feature';
+function buildPromptPayload(args) {
   const projectName = (args.projectName ?? '').toString().trim();
   const chatgptProjectName = (args.chatgptProjectName ?? '').toString().trim();
+  const taskName = (args.taskName ?? args.projectName ?? '').toString().trim() || 'Ukendt opgave';
   const systemType = args.systemType ?? 'Natively';
-  const appType = args.appType ?? 'web';
-  const copilotModel = (args.copilotModel ?? 'GPT-5.1-Codex').toString().trim();
+  const mode = args.copilotMode ?? 'agent';
+  const modeLabel = mode === 'edit' ? 'Edit mode' : 'Agent mode';
+  const copilotModel = selectCopilotModel(args);
+  const briefHeading = args.kind ? `BRIEF (${args.kind.toUpperCase()})` : 'BRIEF';
+  const briefBody = buildBrief(args);
+  const headerParts = [`OPGAVE: ${taskName}`];
+  if (projectName) headerParts.push(`Projekt: ${projectName}`);
+  if (chatgptProjectName) headerParts.push(`ChatGPT Project: ${chatgptProjectName}`);
+  headerParts.push(`System: ${systemType}`);
+  headerParts.push(`Mode: ${modeLabel}`);
+  headerParts.push(`Copilot model: ${copilotModel}`);
+  const rulesBlock = [
+    'Regler (fast workflow)',
+    mode === 'edit'
+      ? '- Du arbejder i VS Code Copilot Edit mode (inline edits).'
+      : '- Du arbejder i VS Code Copilot Agent mode (chat).',
+    '- Ingen repo-søgning (“find…”, “søg…”). Arbejd kun ud fra det jeg indsætter.',
+    '- Returnér ALTID hele opdaterede filer (1:1 klar til overskrivning), aldrig diff/uddrag.',
+    '- Branch: Hvis dette er første prompt for opgaven, så arbejd i en dedikeret branch.'
+  ].join('\n');
 
-  const kindTitle =
-    kind === 'bug'
-      ? 'BUG'
-      : kind === 'ui'
-        ? 'UI DESIGN'
-        : kind === 'enhancement'
-          ? 'ENHANCEMENT'
-          : 'FEATURE';
+  const nextStepsText = buildNextStepsBlock().trimEnd();
+  const outputText = [
+    headerParts.join('\n'),
+    '',
+    rulesBlock,
+    '',
+    briefHeading,
+    briefBody,
+    '',
+    nextStepsText
+  ].join('\n').trimEnd();
 
-  const brief = buildBrief(args);
-  const nextSteps = buildNextStepsBlock(appType);
-  const preview = getPreviewCommand(appType);
-
-  return (
-    `${kindTitle} – Copilot prompt (VS Code Copilot Chat / Edit mode)\n` +
-    `Projekt: ${projectName}\n` +
-    (chatgptProjectName ? `ChatGPT Project: ${chatgptProjectName}\n` : '') +
-    `System: ${systemType}\n` +
-    `App-type: ${appType}\n` +
-    `Copilot model: ${copilotModel}\n\n` +
-    'Regler (fast workflow)\n' +
-    '- Du arbejder i VS Code Copilot Chat (Edit mode).\n' +
-    '- Ingen repo-søgning (“find…”, “søg…”). Arbejd kun ud fra det jeg indsætter.\n' +
-    '- Returnér ALTID hele opdaterede filer (1:1 klar til overskrivning), aldrig diff/uddrag.\n' +
-    `- Preview/test default: ${preview}\n` +
-    '- Branch: Hvis dette er første prompt for dette issue: start en ny branch før du begynder.\n\n' +
-    'BUG/FEATURE BRIEF\n' +
-    `${brief}\n\n` +
-    nextSteps.trimEnd()
-  );
-}
-
-function extractNextSteps(outputText) {
-  const marker = '✅ NÆSTE SKRIDT';
-  const idx = outputText.indexOf(marker);
-  if (idx === -1) return '';
-  return outputText.slice(idx).trimEnd();
+  return { outputText, nextStepsText, copilotModel };
 }
 
 function loadWidgetHtml() {
@@ -239,12 +227,12 @@ function createWizardServer() {
     async (rawArgs) => {
       console.log('[MCP] generate_prompt called', {
         projectName: rawArgs?.projectName,
-        kind: rawArgs?.kind
+        kind: rawArgs?.kind,
+        taskName: rawArgs?.taskName
       });
       const args = GeneratePromptSchema.parse(rawArgs ?? {});
-      const outputText = buildPrompt(args);
-      const nextStepsText = extractNextSteps(outputText);
-      const structuredContent = { outputText, nextStepsText };
+      const promptPayload = buildPromptPayload(args);
+      const structuredContent = promptPayload;
       const fallbackPayload = JSON.stringify(structuredContent);
 
       return {

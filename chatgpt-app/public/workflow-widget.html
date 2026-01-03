@@ -21,55 +21,32 @@
       box-shadow: 0 20px 60px rgba(0,0,0,0.25);
       padding: 26px;
     }
-    h1 { color: #4f46e5; margin-bottom: 10px; font-size: 26px; }
-    .banner {
-      background: #1e3a8a;
-      color: #e0f2fe;
-      border-radius: 12px;
-      padding: 14px 16px;
-      margin-bottom: 18px;
-      position: relative;
-    }
-    .banner button {
-      background: rgba(255,255,255,0.15);
-      color: #e0f2fe;
-      border: none;
-      border-radius: 8px;
-      padding: 6px 12px;
-      font-size: 12px;
-      cursor: pointer;
-      margin-top: 10px;
-      margin-right: 10px;
-    }
-    .banner button:hover { background: rgba(255,255,255,0.25); }
-    .banner-dismiss {
-      position: absolute;
-      top: 10px;
-      right: 12px;
-      background: transparent;
-      color: #bae6fd;
-      font-size: 18px;
-      line-height: 1;
-      padding: 0;
-    }
-    .banner-status {
-      margin-top: 8px;
-      font-size: 12px;
-      color: #bbf7d0;
-    }
+    h1 { color: #4f46e5; margin-bottom: 16px; font-size: 26px; }
     .info-box {
       background: #fff3cd;
       border: 1px solid #ffc107;
       border-radius: 10px;
-      padding: 14px;
+      padding: 14px 42px 14px 14px;
       margin-bottom: 18px;
-      font-size: 13px;
+      font-size: 14px;
       line-height: 1.55;
+      color: #5c4402;
+      position: relative;
     }
-    .info-box strong { display: block; margin-bottom: 6px; color: #856404; }
+    .info-close {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      border: none;
+      background: transparent;
+      color: #b7791f;
+      font-size: 18px;
+      cursor: pointer;
+      line-height: 1;
+    }
     .section {
-      margin-bottom: 18px;
-      padding-bottom: 18px;
+      margin-bottom: 20px;
+      padding-bottom: 20px;
       border-bottom: 1px solid #e5e7eb;
     }
     .section:last-child { border-bottom: none; }
@@ -97,14 +74,6 @@
     textarea { resize: vertical; min-height: 92px; }
     textarea.large { min-height: 190px; }
     textarea.readonly { background: #f3f4f6; cursor: not-allowed; }
-    .grid-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
-    }
-    @media (max-width: 640px) {
-      .grid-2 { grid-template-columns: 1fr; }
-    }
     button {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: #fff;
@@ -115,9 +84,9 @@
       font-weight: 700;
       cursor: pointer;
       transition: transform 0.15s, box-shadow 0.15s;
-      margin-right: 10px;
-      margin-top: 10px;
+      margin-top: 12px;
     }
+    button + button { margin-left: 10px; }
     button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(102,126,234,0.35); }
     button:disabled { opacity: 0.55; cursor: not-allowed; transform: none; box-shadow: none; }
     button.secondary { background: #334155; }
@@ -137,7 +106,7 @@
       border: 2px solid #2196F3;
       border-radius: 12px;
       padding: 14px;
-      margin-top: 12px;
+      margin-top: 16px;
     }
     .next-steps-box label { color: #1976D2; font-size: 15px; }
     .hint {
@@ -146,106 +115,84 @@
       margin-top: 6px;
       line-height: 1.4;
     }
+    .completion-box {
+      background: #f4f8ff;
+      border: 2px solid #c7d2fe;
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 12px;
+    }
+    .completion-box ol {
+      padding-left: 18px;
+      color: #1e293b;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .completion-box li { margin-bottom: 6px; }
+    .field-group + .field-group { margin-top: 12px; }
   </style>
 </head>
 <body>
   <div class="container">
-    <div id="projectsBanner" class="banner" style="display:none;">
-      <strong>ChatGPT Projects understøtter ikke Apps/Connectors endnu.</strong>
-      <div>Hvis wizard ikke kan åbnes i et Project: åbne wizard i en normal chat og kopier output ind i Project.</div>
-      <div class="button-group" style="margin-top:10px;">
-        <button id="copyWorkaroundBtn" type="button">Kopiér workaround</button>
-      </div>
-      <div id="bannerStatus" class="banner-status"></div>
-      <button id="dismissBannerBtn" class="banner-dismiss" type="button" aria-label="Luk banner">×</button>
+    <div id="infoBox" class="info-box">
+      ChatGPT Projects understøtter ikke Apps/Connectors endnu. Åben wizard i en normal chat og flyt chatten til et projekt, når opgaven er afsluttet.
+      <button id="dismissInfoBtn" class="info-close" type="button" aria-label="Skjul besked">×</button>
     </div>
 
     <h1>Workflow Wizard</h1>
 
-    <div class="info-box">
-      <strong>Husk før du starter</strong>
-      ✅ Start wizard fra chatten inde i det ChatGPT Project der hører til app’en<br />
-      ✅ Dobbelttjek at <b>Projekt</b> + <b>System (Base44/Natively)</b> matcher
-    </div>
-
-    <!-- Projekt -->
     <div class="section">
-      <label>Projekt</label>
-      <select id="projectSelect">
-        <option value="">Vælg projekt</option>
+      <label>System</label>
+      <select id="systemType">
+        <option value="Natively">Natively</option>
+        <option value="Base44">Base44</option>
       </select>
-      <div class="button-group">
-        <button id="createProjectBtn" type="button">Opret projekt</button>
-        <button id="deleteProjectBtn" type="button" class="secondary" disabled>Slet projekt</button>
-      </div>
-
-      <div class="hint">Projekt bliver auto-udfyldt via “senest aktive projekt” (localStorage). Det kan ikke læses direkte fra dit ChatGPT Project.</div>
-
-      <label style="margin-top:12px;">Project name (auto)</label>
-      <input id="projectName" type="text" readonly placeholder="Vælg eller opret et projekt" />
-
-      <label style="margin-top:12px;">ChatGPT Project name (valgfrit)</label>
-      <input id="chatgptProjectName" type="text" placeholder="fx GPT app – til kodning i VS" />
     </div>
 
-    <!-- System / App -->
     <div class="section">
-      <div class="grid-2">
-        <div>
-          <label>System</label>
-          <select id="systemType">
-            <option value="Natively">Natively</option>
-            <option value="Base44">Base44</option>
-          </select>
-        </div>
-        <div>
-          <label>App-type</label>
-          <select id="appType">
-            <option value="web">Web</option>
-            <option value="react-native-expo">React Native / Expo</option>
-            <option value="backend">Backend</option>
-          </select>
-        </div>
-      </div>
-
-      <label style="margin-top:12px;">Copilot model</label>
-      <input id="copilotModel" type="text" value="GPT-5.1-Codex" />
-    </div>
-
-    <!-- Fix type + brief -->
-    <div class="section">
-      <label>Type</label>
-      <select id="kindSelect">
-        <option value="bug">Bug</option>
-        <option value="feature" selected>Feature</option>
-        <option value="ui">UI design</option>
-        <option value="enhancement">Enhancement</option>
-      </select>
-
-      <label style="margin-top:12px;">BUG/FEATURE BRIEF (paste her)</label>
-      <textarea id="pastedText" class="large" placeholder="Indsæt beskrivelse af problemet/feature, repro, scope, constraints, og indsatte filer (hel tekst)"></textarea>
+      <label>Paste specs/brief</label>
+      <textarea id="pastedText" class="large" placeholder="Indsæt hele beskrivelsen af problemet/feature, scope, constraints og indsatte filer"></textarea>
 
       <div class="button-group">
         <button id="generateBtn" type="button">Generer prompt</button>
-        <button id="copyPromptBtn" type="button" class="secondary">Copy Copilot prompt</button>
       </div>
       <div id="genStatus" class="status"></div>
     </div>
 
-    <!-- Output -->
     <div class="section">
-      <label>Copilot prompt</label>
+      <div class="field-group">
+        <label>Navn på opgaven</label>
+        <input id="taskName" type="text" placeholder="fx “Fix dashboard filters i Base44”" />
+      </div>
+
+      <div class="field-group">
+        <label>Mode</label>
+        <select id="copilotMode">
+          <option value="agent">Agent</option>
+          <option value="edit">Edit</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label>Copilot model</label>
+        <input id="copilotModel" type="text" placeholder="Udfyldes automatisk" readonly />
+      </div>
+
+      <label style="margin-top:12px;">Copilot prompt</label>
       <textarea id="output" class="large readonly" readonly></textarea>
+
+      <div class="button-group" style="margin-top:0;">
+        <button id="copyPromptBtn" type="button" class="secondary">Copy Copilot prompt</button>
+      </div>
 
       <div class="next-steps-box">
         <label>✅ Næste skridt</label>
         <textarea id="nextSteps" class="readonly" readonly></textarea>
       </div>
 
-      <div class="hint">“Næste skridt” udfyldes automatisk ud fra prompten (fra ✅ NÆSTE SKRIDT-blokken).</div>
+      <div class="hint">“Næste skridt” viser iterationstrinnene fra generate_prompt. Test-cyklus vises først når opgaven er ved at blive afsluttet.</div>
     </div>
 
-    <!-- Follow-up -->
     <div class="section">
       <label>Svar fra Copilot</label>
       <textarea id="copilotAnswer" class="large" placeholder="Indsæt Copilots svar her..."></textarea>
@@ -253,72 +200,76 @@
       <label style="margin-top:12px;">Indhold af ændrede filer</label>
       <textarea id="changedFiles" class="large" placeholder="Indsæt hele indholdet af de ændrede filer her (1:1)"></textarea>
 
-      <label style="margin-top:12px;">Status</label>
-      <select id="issueStatus">
-        <option value="not_solved">Ikke løst</option>
-        <option value="solved">Løst</option>
-      </select>
+      <div id="statusSection" style="display:none; margin-top:12px;">
+        <label>Status</label>
+        <select id="issueStatus">
+          <option value="not_solved">Ikke løst</option>
+          <option value="solved">Løst</option>
+        </select>
+
+        <div id="commentWrapper" style="display:none; margin-top:12px;">
+          <label>Kommentar</label>
+          <textarea id="statusComment" placeholder="Forklar hvorfor opgaven ikke er løst"></textarea>
+        </div>
+      </div>
 
       <div class="button-group">
         <button id="sendBtn" type="button">Send</button>
-        <button id="startNewBtn" type="button" class="secondary">Start ny prompt</button>
       </div>
       <div id="sendStatus" class="status"></div>
+    </div>
+
+    <div id="completionSection" class="section" style="display:none;">
+      <label>Afslutning af opgave</label>
+      <div class="completion-box">
+        <ol>
+          <li>Commit ændringerne med en præcis besked (fx “fix: login redirect bug”).</li>
+          <li>Merge din branch ind i main: git checkout main → git pull → git merge &lt;branch&gt; → git push.</li>
+          <li>Slet feature-branchen både lokalt og remote, så repoet holdes rent.</li>
+          <li>Pull seneste main på din maskine og verificer, at alt bygger og virker.</li>
+        </ol>
+      </div>
+      <button id="completionDoneBtn" type="button">Udført</button>
+      <div id="completionMessage" class="hint" style="display:none; font-weight:600;"></div>
     </div>
   </div>
 
   <script>
-    const PROJECTS_KEY = 'copilotflow_projects_v1';
-    const ACTIVE_PROJECT_KEY = 'copilotflow_active_project_v1';
-    const PROJECT_BANNER_DISMISSED_KEY = 'copilotflow_projects_banner_dismissed_v1';
-    const PROJECT_NAME_KEY = 'copilotflow_chatgpt_project_name_v1';
-    const SOLVED_NEXT_STEPS_TEXT =
-      '✅ NÆSTE SKRIDT (LØST)\n' +
-      '1) Merge til main:\n' +
-      '   git checkout main\n' +
-      '   git pull\n' +
-      '   git merge <din-branch>\n' +
-      '   git push\n' +
-      '2) Slet branch lokalt + remote:\n' +
-      '   git branch -d <din-branch>\n' +
-      '   git push origin --delete <din-branch>';
-    const WORKAROUND_TEXT =
-      'Hvis wizard ikke åbner i et ChatGPT Project: start en normal chat, kør Workflow Wizard der, og kopier prompt/output ind i Project-chatten.';
+    const INFO_BOX_KEY = 'workflow_info_box_dismissed_v2';
+    const SOLVED_TRIGGER_PHRASE = 'bug/feature løst';
+    const TEST_CYCLE_TEXT =
+      '🔁 TEST-CYKLUS\n' +
+      '1) Kør komplette tests (unit/e2e) + manuel QA på de berørte flows.\n' +
+      '2) Dokumentér resultater (screenshots, logs, forventet vs faktisk).\n' +
+      '3) Bekræft at alt matcher acceptance criteria før merge.\n';
 
     const els = {
-      banner: document.getElementById('projectsBanner'),
-      copyWorkaroundBtn: document.getElementById('copyWorkaroundBtn'),
-      dismissBannerBtn: document.getElementById('dismissBannerBtn'),
-      bannerStatus: document.getElementById('bannerStatus'),
-
-      projectSelect: document.getElementById('projectSelect'),
-      createProjectBtn: document.getElementById('createProjectBtn'),
-      deleteProjectBtn: document.getElementById('deleteProjectBtn'),
-      projectName: document.getElementById('projectName'),
-      chatgptProjectName: document.getElementById('chatgptProjectName'),
-
+      infoBox: document.getElementById('infoBox'),
+      dismissInfoBtn: document.getElementById('dismissInfoBtn'),
       systemType: document.getElementById('systemType'),
-      appType: document.getElementById('appType'),
-      copilotModel: document.getElementById('copilotModel'),
-
-      kindSelect: document.getElementById('kindSelect'),
+      taskName: document.getElementById('taskName'),
+      copilotMode: document.getElementById('copilotMode'),
       pastedText: document.getElementById('pastedText'),
-
       generateBtn: document.getElementById('generateBtn'),
       copyPromptBtn: document.getElementById('copyPromptBtn'),
       genStatus: document.getElementById('genStatus'),
-
+      copilotModel: document.getElementById('copilotModel'),
       output: document.getElementById('output'),
       nextSteps: document.getElementById('nextSteps'),
-
       copilotAnswer: document.getElementById('copilotAnswer'),
       changedFiles: document.getElementById('changedFiles'),
+      statusSection: document.getElementById('statusSection'),
       issueStatus: document.getElementById('issueStatus'),
-
+      commentWrapper: document.getElementById('commentWrapper'),
+      statusComment: document.getElementById('statusComment'),
       sendBtn: document.getElementById('sendBtn'),
-      startNewBtn: document.getElementById('startNewBtn'),
-      sendStatus: document.getElementById('sendStatus')
+      sendStatus: document.getElementById('sendStatus'),
+      completionSection: document.getElementById('completionSection'),
+      completionDoneBtn: document.getElementById('completionDoneBtn'),
+      completionMessage: document.getElementById('completionMessage')
     };
+
+    const state = { closurePhaseActive: false };
 
     function showStatus(el, message, type='info') {
       el.textContent = message;
@@ -327,161 +278,21 @@
       setTimeout(() => { el.style.display = 'none'; }, 4500);
     }
 
-    function showBannerStatus(message) {
-      els.bannerStatus.textContent = message;
-      setTimeout(() => { els.bannerStatus.textContent = ''; }, 3500);
-    }
-
-    function safeReadJSON(key, fallback) {
-      try {
-        const raw = localStorage.getItem(key);
-        if (!raw) return fallback;
-        return JSON.parse(raw);
-      } catch {
-        return fallback;
-      }
-    }
-    function safeWriteJSON(key, value) {
-      try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
-    }
-
-    function loadProjects() {
-      return safeReadJSON(PROJECTS_KEY, []);
-    }
-    function saveProjects(projects) {
-      safeWriteJSON(PROJECTS_KEY, projects);
-    }
-    function loadActiveProjectId() {
-      try { return localStorage.getItem(ACTIVE_PROJECT_KEY) || ''; } catch { return ''; }
-    }
-    function saveActiveProjectId(id) {
-      try {
-        if (id) localStorage.setItem(ACTIVE_PROJECT_KEY, id);
-        else localStorage.removeItem(ACTIVE_PROJECT_KEY);
-      } catch {}
-    }
-
-    function uuid() {
-      if (crypto && crypto.randomUUID) return crypto.randomUUID();
-      return `proj-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
-    }
-
-    let projects = [];
-    let activeProjectId = '';
-
-    function getActiveProject() {
-      return projects.find(p => p.id === activeProjectId) || null;
-    }
-
-    function renderProjects() {
-      els.projectSelect.innerHTML = '';
-      const placeholder = document.createElement('option');
-      placeholder.value = '';
-      placeholder.textContent = 'Vælg projekt';
-      els.projectSelect.appendChild(placeholder);
-
-      projects.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = p.name;
-        els.projectSelect.appendChild(opt);
-      });
-
-      els.projectSelect.value = activeProjectId || '';
-      els.deleteProjectBtn.disabled = !activeProjectId;
-
-      const ap = getActiveProject();
-      els.projectName.value = ap?.name || '';
-      els.projectName.placeholder = ap ? '' : 'Vælg eller opret et projekt';
-    }
-
-    function initProjects() {
-      projects = loadProjects();
-      activeProjectId = loadActiveProjectId();
-      if (activeProjectId && !projects.some(p => p.id === activeProjectId)) {
-        activeProjectId = '';
-        saveActiveProjectId('');
-      }
-      renderProjects();
-    }
-
-    function initBanner() {
-      const dismissed = localStorage.getItem(PROJECT_BANNER_DISMISSED_KEY);
-      if (!dismissed) {
-        els.banner.style.display = 'block';
-      }
-    }
-
-    els.copyWorkaroundBtn.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(WORKAROUND_TEXT);
-        showBannerStatus('Workaround kopieret til clipboard.');
-      } catch {
-        showBannerStatus('Kunne ikke kopiere – kopier teksten manuelt.');
-      }
-    });
-
-    els.dismissBannerBtn.addEventListener('click', () => {
-      els.banner.style.display = 'none';
-      try { localStorage.setItem(PROJECT_BANNER_DISMISSED_KEY, '1'); } catch {}
-    });
-
-    els.createProjectBtn.addEventListener('click', () => {
-      const name = prompt('Projektnavn (fx "Football Coach — Natively")');
-      if (!name || !name.trim()) return;
-      const newProject = { id: uuid(), name: name.trim(), createdAt: new Date().toISOString() };
-      projects = [...projects, newProject];
-      saveProjects(projects);
-      activeProjectId = newProject.id;
-      saveActiveProjectId(activeProjectId);
-      renderProjects();
-    });
-
-    els.deleteProjectBtn.addEventListener('click', () => {
-      const ap = getActiveProject();
-      if (!ap) return;
-      if (!confirm(`Slet projekt "${ap.name}"?`)) return;
-      projects = projects.filter(p => p.id !== ap.id);
-      saveProjects(projects);
-      activeProjectId = '';
-      saveActiveProjectId('');
-      renderProjects();
-    });
-
-    els.projectSelect.addEventListener('change', (e) => {
-      activeProjectId = e.target.value || '';
-      saveActiveProjectId(activeProjectId);
-      renderProjects();
-    });
-
     function safeParseJSON(text) {
-      try {
-        return JSON.parse(text);
-      } catch {
-        return null;
-      }
+      try { return JSON.parse(text); } catch { return null; }
     }
 
     function tryExtractStructured(obj) {
       if (!obj || typeof obj !== 'object') return null;
-      const result = { outputText: '', nextStepsText: '' };
+      const result = {};
       let found = false;
-
-      if (typeof obj.outputText === 'string') {
-        result.outputText = obj.outputText;
-        found = true;
-      }
-      if (typeof obj.nextStepsText === 'string') {
-        result.nextStepsText = obj.nextStepsText;
-        found = true;
-      }
-
+      if (typeof obj.outputText === 'string') { result.outputText = obj.outputText; found = true; }
+      if (typeof obj.nextStepsText === 'string') { result.nextStepsText = obj.nextStepsText; found = true; }
+      if (typeof obj.copilotModel === 'string') { result.copilotModel = obj.copilotModel; found = true; }
       if (found) return result;
-
       if (obj.structuredContent && typeof obj.structuredContent === 'object') {
         return tryExtractStructured(obj.structuredContent);
       }
-
       return null;
     }
 
@@ -506,63 +317,104 @@
         resp?.result,
         resp?.data
       ];
-
       for (const candidate of candidates) {
         const extracted = tryExtractStructured(candidate);
         if (extracted) return extracted;
       }
-
       return extractFromContentArray(resp?.content);
     }
 
-    function loadChatgptProjectName() {
-      try {
-        const value = localStorage.getItem(PROJECT_NAME_KEY) || '';
-        els.chatgptProjectName.value = value;
-      } catch {
-        els.chatgptProjectName.value = '';
+    function initInfoBox() {
+      let dismissed = false;
+      try { dismissed = localStorage.getItem(INFO_BOX_KEY) === '1'; } catch {}
+      if (dismissed) {
+        els.infoBox.style.display = 'none';
       }
     }
 
-    els.chatgptProjectName.addEventListener('input', (e) => {
-      try {
-        localStorage.setItem(PROJECT_NAME_KEY, e.target.value);
-      } catch {}
+    els.dismissInfoBtn.addEventListener('click', () => {
+      els.infoBox.style.display = 'none';
+      try { localStorage.setItem(INFO_BOX_KEY, '1'); } catch {}
+    });
+
+    function resetClosurePhaseUI() {
+      state.closurePhaseActive = false;
+      els.statusSection.style.display = 'none';
+      els.issueStatus.value = 'not_solved';
+      els.commentWrapper.style.display = 'none';
+      els.statusComment.value = '';
+      hideCompletionSection();
+    }
+
+    function hideCompletionSection() {
+      els.completionSection.style.display = 'none';
+      els.completionMessage.style.display = 'none';
+      els.completionMessage.textContent = '';
+      els.completionDoneBtn.disabled = false;
+    }
+
+    function updateCommentVisibility() {
+      if (!state.closurePhaseActive) {
+        els.commentWrapper.style.display = 'none';
+        els.statusComment.value = '';
+        return;
+      }
+      if (els.issueStatus.value === 'not_solved') {
+        els.commentWrapper.style.display = 'block';
+      } else {
+        els.commentWrapper.style.display = 'none';
+        els.statusComment.value = '';
+      }
+      if (els.issueStatus.value !== 'solved') {
+        hideCompletionSection();
+      }
+    }
+
+    function enterClosurePhase() {
+      if (state.closurePhaseActive) return;
+      state.closurePhaseActive = true;
+      els.statusSection.style.display = 'block';
+      els.nextSteps.value = TEST_CYCLE_TEXT;
+      updateCommentVisibility();
+      showStatus(els.sendStatus, 'Afslutningsfase aktiveret – udfyld status før næste svar.', 'info');
+    }
+
+    els.issueStatus.addEventListener('change', updateCommentVisibility);
+
+    els.completionDoneBtn.addEventListener('click', () => {
+      els.completionDoneBtn.disabled = true;
+      els.completionMessage.textContent = 'Åbn en ny chat for næste opgave og skriv open_wizard.';
+      els.completionMessage.style.display = 'block';
     });
 
     async function generatePrompt() {
-      const ap = getActiveProject();
-      if (!ap) {
-        showStatus(els.genStatus, 'Vælg eller opret et projekt først', 'error');
+      const taskName = els.taskName.value.trim();
+      const pasted = els.pastedText.value.trim();
+      if (!taskName) {
+        showStatus(els.genStatus, 'Udfyld “Navn på opgaven” først', 'error');
+        return;
+      }
+      if (!pasted) {
+        showStatus(els.genStatus, 'Indsæt specs/brief først', 'error');
         return;
       }
 
       const payload = {
-        projectName: ap.name,
+        taskName,
+        copilotMode: els.copilotMode.value,
         systemType: els.systemType.value,
-        appType: els.appType.value,
-        copilotModel: els.copilotModel.value,
-        kind: els.kindSelect.value,
-        pastedText: els.pastedText.value,
-        chatgptProjectName: els.chatgptProjectName.value.trim()
+        pastedText: els.pastedText.value
       };
 
-      if (!payload.pastedText.trim()) {
-        showStatus(els.genStatus, 'Indsæt BUG/FEATURE BRIEF først', 'error');
-        return;
-      }
-
       els.generateBtn.disabled = true;
+      els.copilotModel.value = '';
       showStatus(els.genStatus, 'Genererer...', 'info');
 
       try {
-        let resp;
-        if (window.openai?.callTool) {
-          resp = await window.openai.callTool('generate_prompt', payload);
-        } else {
+        if (!window.openai?.callTool) {
           throw new Error('window.openai.callTool findes ikke i denne host');
         }
-
+        const resp = await window.openai.callTool('generate_prompt', payload);
         const structured = deriveStructuredContent(resp);
 
         if (!structured) {
@@ -573,10 +425,13 @@
           return;
         }
 
+        resetClosurePhaseUI();
         els.output.value = structured.outputText || '';
         els.nextSteps.value = structured.nextStepsText || '';
+        const model = (structured.copilotModel || 'GPT-5.1-Codex').trim();
+        els.copilotModel.value = model;
 
-        showStatus(els.genStatus, '✅ Done', 'success');
+        showStatus(els.genStatus, '✅ Prompt klar', 'success');
       } catch (err) {
         console.error(err);
         showStatus(els.genStatus, `Fejl: ${err.message || err}`, 'error');
@@ -589,7 +444,10 @@
 
     els.copyPromptBtn.addEventListener('click', async () => {
       const text = els.output.value;
-      if (!text) return showStatus(els.genStatus, 'Intet at kopiere', 'error');
+      if (!text) {
+        showStatus(els.genStatus, 'Intet at kopiere', 'error');
+        return;
+      }
       try {
         await navigator.clipboard.writeText(text);
         showStatus(els.genStatus, 'Copilot prompt kopieret', 'success');
@@ -598,58 +456,47 @@
       }
     });
 
-    function buildFollowUpMessage() {
-      const ap = getActiveProject();
-      const status = els.issueStatus.value === 'solved' ? 'Løst' : 'Ikke løst';
-
-      return (
-        'WORKFLOW WIZARD – OPFØLGNING\n' +
-        `Projekt: ${ap?.name || ''}\n` +
-        `System: ${els.systemType.value}\n` +
-        `App-type: ${els.appType.value}\n` +
-        `Type: ${els.kindSelect.value}\n` +
-        `Status: ${status}\n\n` +
+    function buildFollowUpMessage(includeStatus) {
+      let payload =
         'Svar fra Copilot:\n' +
         (els.copilotAnswer.value.trim() || '(intet indsat)') +
         '\n\n' +
         'Indhold af ændrede filer:\n' +
-        (els.changedFiles.value.trim() || '(intet indsat)') +
-        '\n'
-      );
+        (els.changedFiles.value.trim() || '(intet indsat)');
+      if (includeStatus) {
+        const statusText = els.issueStatus.value === 'solved' ? 'Løst' : 'Ikke løst';
+        payload += `\n\nStatus: ${statusText}`;
+        if (els.issueStatus.value === 'not_solved') {
+          payload += `\nKommentar: ${els.statusComment.value.trim() || '(ingen kommentar)'}`;
+        }
+      }
+      return payload;
     }
 
     els.sendBtn.addEventListener('click', async () => {
-      const ap = getActiveProject();
-      if (!ap) {
-        showStatus(els.sendStatus, 'Vælg et projekt først', 'error');
-        return;
-      }
-
-      if (els.issueStatus.value === 'solved') {
-        els.nextSteps.value = SOLVED_NEXT_STEPS_TEXT;
-      }
-
-      const followUp = buildFollowUpMessage();
-
+      const includeStatus = state.closurePhaseActive;
+      const followUp = buildFollowUpMessage(includeStatus);
       els.sendBtn.disabled = true;
       showStatus(els.sendStatus, 'Sender til ChatGPT...', 'info');
 
       try {
         const sender = window.openai?.sendFollowUpMessage || window.openai?.sendFollowupMessage;
         if (!sender) throw new Error('sendFollowUpMessage findes ikke i denne host');
-
         await sender({ prompt: followUp });
+        showStatus(els.sendStatus, '✅ Sendt', 'success');
 
-        if (els.issueStatus.value === 'solved') {
-          showStatus(els.sendStatus, '✅ Sendt – issue markeret som løst', 'success');
-        } else {
-          showStatus(els.sendStatus, '✅ Sendt', 'success');
+        const lowerAnswer = els.copilotAnswer.value.toLowerCase();
+        if (!state.closurePhaseActive && lowerAnswer.includes(SOLVED_TRIGGER_PHRASE)) {
+          enterClosurePhase();
+        }
+        if (state.closurePhaseActive && els.issueStatus.value === 'solved') {
+          els.completionSection.style.display = 'block';
         }
       } catch (err) {
         console.error(err);
         try {
           await navigator.clipboard.writeText(followUp);
-          showStatus(els.sendStatus, 'Kunne ikke sende. Jeg kopierede teksten til clipboard i stedet.', 'error');
+          showStatus(els.sendStatus, 'Kunne ikke sende. Teksten er kopieret til clipboard.', 'error');
         } catch {
           showStatus(els.sendStatus, `Fejl: ${err.message || err}`, 'error');
         }
@@ -658,21 +505,7 @@
       }
     });
 
-    els.startNewBtn.addEventListener('click', () => {
-      els.kindSelect.value = 'feature';
-      els.pastedText.value = '';
-      els.output.value = '';
-      els.nextSteps.value = '';
-      els.copilotAnswer.value = '';
-      els.changedFiles.value = '';
-      els.issueStatus.value = 'not_solved';
-      showStatus(els.sendStatus, 'Klar til næste issue (projekt/system/app-type beholdes)', 'success');
-      els.pastedText.focus();
-    });
-
-    initProjects();
-    initBanner();
-    loadChatgptProjectName();
+    initInfoBox();
   </script>
 </body>
 </html>
