@@ -7,269 +7,321 @@ import { z } from 'zod';
 
 const PORT = Number(process.env.PORT ?? 8787);
 const MCP_PATH = '/mcp';
+const WIDGET_URL = new URL('./public/workflow-widget.html', import.meta.url);
+const WIDGET_URI = 'ui://widget/workflow.html';
 
-const NEXT_STEPS = `✅ NÆSTE SKRIDT
-(1) Indsæt hele indholdet af de ændrede filer til validering (1:1 klar til overskrivning)
-(2) Kør tests: Web → \`npm run dev\` og test i browser
-(3) Rapportér tilbage: hvad du ser + logs/errors + evt. screenshots
-(4) Commit med foreslået commit message
-(5) Test igen efter commit (hurtig sanity)
-(6) Skriv “bug/feature løst” når det er færdigt
-`;
+// --------- Schemas ----------
+const GeneratePromptSchema = z.object({
+  projectName: z.string().optional(),
+  kind: z.enum(['bug', 'feature', 'enhancement', 'ui']).optional(),
+  pastedText: z.string().optional(),
+  systemType: z.enum(['Base44', 'Natively']).optional(),
+  appType: z.enum(['web', 'react-native-expo', 'backend']).optional(),
+  copilotModel: z.string().optional(),
 
-function hasStructuredValues(values) {
-	if (!values) return false;
-	return Object.values(values).some((value) => (value ?? '').toString().trim().length > 0);
+  bugId: z.string().optional(),
+  goalBullets: z.string().optional(),
+  reproSteps: z.string().optional(),
+  expectedVsActual: z.string().optional(),
+  scope: z.string().optional(),
+  constraints: z.string().optional(),
+  filesList: z.string().optional(),
+  doneCriteria: z.string().optional()
+});
+
+// --------- Prompt helpers ----------
+function getPreviewCommand(appType) {
+  if (appType === 'react-native-expo') return 'npx expo start -c --tunnel (åbn i Expo Go på iPhone)';
+  if (appType === 'backend') return 'Start server lokalt + test endpoints';
+  return 'npm run dev (åbn localhost i browser)';
 }
 
-function formatLine(label, value) {
-	const trimmed = (value ?? '').toString().trim();
-	return trimmed ? `${label}: ${trimmed}` : null;
+function buildNextStepsBlock(appType) {
+  const preview = getPreviewCommand(appType);
+  return (
+    '✅ NÆSTE SKRIDT\n' +
+    '1) Indsæt hele indholdet af de ændrede filer til validering (1:1):\n' +
+    '   - <FIL 1>\n' +
+    '   - <FIL 2>\n' +
+    '   - <FIL 3>\n' +
+    `2) Kør tests: ${preview}\n` +
+    '3) Rapportér tilbage: hvad du ser + logs/errors + evt. screenshots\n' +
+    '4) Commit:\n' +
+    '   - Commit message: <fx "fix: ..." eller "feat: ...">\n' +
+    '5) Når alt er grønt: skriv “bug/feature løst”\n'
+  );
 }
 
-function collectStructuredSections(kind, values) {
-	if (!hasStructuredValues(values)) return [];
-	const get = (key) => (values?.[key] ?? '').toString().trim();
-	const sections = [];
+function buildBrief(args) {
+  const parts = [];
+  const add = (label, value) => {
+    const v = (value ?? '').toString().trim();
+    if (v) parts.push(`- ${label}: ${v}`);
+  };
 
-	if (kind === 'bug') {
-		const bugId = get('bugId');
-		const title = get('title');
-		if (bugId && title) {
-			sections.push(`Titel: ${bugId} – ${title}`);
-		} else if (title) {
-			sections.push(`Titel: ${title}`);
-		} else if (bugId) {
-			sections.push(`Titel: ${bugId}`);
-		}
-		const labelMap = {
-			goal: 'Mål',
-			repro: 'Repro',
-			expected: 'Forventet',
-			actual: 'Faktisk',
-			scope: 'Scope',
-			constraints: 'Constraints',
-			filesInserted: 'Indsatte filer',
-		};
-		['goal', 'repro', 'expected', 'actual', 'scope', 'constraints', 'filesInserted'].forEach((key) => {
-			const line = formatLine(labelMap[key], get(key));
-			if (line) sections.push(line);
-		});
-		return sections;
-	}
+  add('ID/titel', args.bugId);
+  add('Mål', args.goalBullets);
+  add('Repro steps', args.reproSteps);
+  add('Forventet vs faktisk', args.expectedVsActual);
+  add('Scope (screens/flows)', args.scope);
+  add('Constraints', args.constraints);
+  add('Indsatte filer', args.filesList);
+  add('Done criteria', args.doneCriteria);
 
-	const commonSections = (keys, labels) => {
-		keys.forEach((key, idx) => {
-			const line = formatLine(labels[idx], get(key));
-			if (line) sections.push(line);
-		});
-	};
+  const structured = parts.length ? parts.join('\n') : '';
+  const pasted = (args.pastedText ?? '').toString().trim();
 
-	if (kind === 'feature' || kind === 'enhancement') {
-		const featureId = get('featureId');
-		if (featureId) sections.push(`Feature: ${featureId}`);
-		const titleLine = formatLine('Titel', get('title'));
-		if (titleLine) sections.push(titleLine);
-		commonSections(
-			['goal', 'scope', 'constraints', 'filesInserted'],
-			['Mål', 'Scope', 'Constraints', 'Indsatte filer'],
-		);
-		return sections;
-	}
-
-	if (kind === 'ui') {
-		const featureId = get('featureId');
-		if (featureId) sections.push(`UI update: ${featureId}`);
-		const titleLine = formatLine('Titel', get('title'));
-		if (titleLine) sections.push(titleLine);
-		commonSections(
-			['goal', 'scope', 'constraints', 'filesInserted', 'designNotes'],
-			['Mål', 'Scope', 'Constraints', 'Indsatte filer', 'Design notes'],
-		);
-		return sections;
-	}
-
-	return sections;
+  if (structured) return structured + (pasted ? `\n\n---\n\n${pasted}` : '');
+  return pasted || '(ingen input)';
 }
 
-function buildPrompt({ kind, projectName, pastedText, values }) {
-	const kindTitle =
-		kind === 'bug'
-			? 'BUG PROMPT'
-			: kind === 'feature'
-				? 'FEATURE PROMPT'
-				: kind === 'enhancement'
-					? 'ENHANCEMENT PROMPT'
-					: 'UI DESIGN UPDATE PROMPT';
+function buildPrompt(args) {
+  const kind = args.kind ?? 'feature';
+  const projectName = (args.projectName ?? '').toString().trim();
+  const systemType = args.systemType ?? 'Natively';
+  const appType = args.appType ?? 'web';
+  const copilotModel = (args.copilotModel ?? 'GPT-5.1-Codex').toString().trim();
 
-	const proj = (projectName ?? '').trim();
-	const input = (pastedText ?? '').trim();
+  const kindTitle =
+    kind === 'bug'
+      ? 'BUG'
+      : kind === 'ui'
+        ? 'UI DESIGN'
+        : kind === 'enhancement'
+          ? 'ENHANCEMENT'
+          : 'FEATURE';
 
-	const structuredSections = collectStructuredSections(kind, values);
-	if (structuredSections.length > 0) {
-		return [
-			kindTitle,
-			proj ? `Projekt: ${proj}` : null,
-			'',
-			...structuredSections,
-			'',
-			NEXT_STEPS.trimEnd(),
-		]
-			.filter((line) => line !== null && line !== undefined)
-			.join('\n');
-	}
+  const brief = buildBrief(args);
+  const nextSteps = buildNextStepsBlock(appType);
+  const preview = getPreviewCommand(appType);
 
-	return [
-		kindTitle,
-		proj ? `Projekt: ${proj}` : null,
-		'',
-		'INPUT:',
-		input || '(ingen input)',
-		'',
-		NEXT_STEPS.trimEnd(),
-	]
-		.filter(Boolean)
-		.join('\n');
+  return (
+    `${kindTitle} – Copilot prompt (VS Code Copilot Chat / Edit mode)\n` +
+    `Projekt: ${projectName}\n` +
+    `System: ${systemType}\n` +
+    `App-type: ${appType}\n` +
+    `Copilot model: ${copilotModel}\n\n` +
+    'Regler (fast workflow)\n' +
+    '- Du arbejder i VS Code Copilot Chat (Edit mode).\n' +
+    '- Ingen repo-søgning (“find…”, “søg…”). Arbejd kun ud fra det jeg indsætter.\n' +
+    '- Returnér ALTID hele opdaterede filer (1:1 klar til overskrivning), aldrig diff/uddrag.\n' +
+    `- Preview/test default: ${preview}\n` +
+    '- Branch: Hvis dette er første prompt for dette issue: start en ny branch før du begynder.\n\n' +
+    'BUG/FEATURE BRIEF\n' +
+    `${brief}\n\n` +
+    nextSteps.trimEnd()
+  );
 }
 
+function extractNextSteps(outputText) {
+  const marker = '✅ NÆSTE SKRIDT';
+  const idx = outputText.indexOf(marker);
+  if (idx === -1) return '';
+  return outputText.slice(idx).trimEnd();
+}
+
+function loadWidgetHtml() {
+  return readFileSync(WIDGET_URL, 'utf8');
+}
+
+function buildWidgetResourceContent() {
+  return {
+    type: 'resource_link',
+    name: 'Workflow Wizard',
+    uri: 'ui://widget/workflow.html',
+    mimeType: 'text/html+skybridge',
+    title: 'Workflow Wizard'
+  };
+}
+
+// --------- MCP server ----------
 function createWizardServer() {
-	const server = new McpServer({ name: 'workflow-wizard', version: '0.1.0' });
+  const server = new McpServer({ name: 'workflow-wizard', version: '1.0.0' });
 
-	server.registerResource(
-		'workflow-widget',
-		'ui://widget/workflow.html',
-		{},
-		async () => {
-			const widgetHtml = readFileSync(new URL('./public/workflow-widget.html', import.meta.url), 'utf8');
-			return {
-				contents: [
-					{
-						uri: 'ui://widget/workflow.html',
-						mimeType: 'text/html+skybridge',
-						text: widgetHtml,
-						_meta: { 'openai/widgetPrefersBorder': true },
-					},
-				],
-			};
-		},
-	);
+  server.registerResource(
+    'workflow-widget',
+    'ui://widget/workflow.html',
+    {
+      title: 'Workflow Wizard Widget',
+      description: 'Interactive workflow wizard UI',
+      mimeType: 'text/html+skybridge'
+    },
+    async (uri) => {
+      const widgetHtml = loadWidgetHtml();
+      const resolvedUri =
+        typeof uri === 'string'
+          ? uri || 'ui://widget/workflow.html'
+          : uri instanceof URL
+            ? uri.href
+            : 'ui://widget/workflow.html';
 
-	const wizardToolHandler = async () => ({
-		content: [{ type: 'text', text: 'Wizard opened.' }],
-		structuredContent: { outputText: '', kind: 'feature', lastError: '' },
-	});
+      return {
+        contents: [
+          {
+            uri: resolvedUri,
+            mimeType: 'text/html+skybridge',
+            text: widgetHtml,
+            _meta: { 'openai/widgetPrefersBorder': true }
+          }
+        ]
+      };
+    }
+  );
 
-	server.registerTool(
-		'open_wizard',
-		{
-			title: 'Open workflow wizard (start ny prompt)',
-			description: 'Open the embedded workflow wizard widget – brug når brugeren skriver "start ny prompt".',
-			inputSchema: {},
-			_meta: {
-				'openai/widgetAccessible': true,
-				'openai/outputTemplate': 'ui://widget/workflow.html',
-				'openai/toolInvocation/invoking': 'Opening wizard',
-				'openai/toolInvocation/invoked': 'Wizard opened',
-			},
-		},
-		wizardToolHandler,
-	);
+  const widgetToolMeta = {
+    'openai/widgetAccessible': true,
+    'openai/outputTemplate': 'ui://widget/workflow.html',
+    'openai/toolInvocation/invoking': 'Opening wizard',
+    'openai/toolInvocation/invoked': 'Wizard opened'
+  };
 
-	server.registerTool(
-		'start_ny_prompt',
-		{
-			title: 'Start ny prompt',
-			description: 'Åbner workflow wizard (alias). Brug når brugeren skriver "start ny prompt".',
-			inputSchema: {},
-			_meta: {
-				'openai/widgetAccessible': true,
-				'openai/outputTemplate': 'ui://widget/workflow.html',
-				'openai/toolInvocation/invoking': 'Opening wizard',
-				'openai/toolInvocation/invoked': 'Wizard opened',
-			},
-		},
-		wizardToolHandler,
-	);
+  server.registerTool(
+    'open_wizard',
+    {
+      title: 'Open Workflow Wizard',
+      description: 'Åbn Workflow Wizard UI',
+      inputSchema: z.object({}),
+      _meta: widgetToolMeta
+    },
+    async () => {
+      console.log('[MCP] open_wizard called');
+      return {
+        content: [
+          buildWidgetResourceContent(),
+          { type: 'text', text: 'Wizard opened.' }
+        ],
+        structuredContent: { outputText: '', nextStepsText: '' }
+      };
+    }
+  );
 
-	const generatePromptInputSchema = {
-		kind: z.enum(['bug', 'feature', 'enhancement', 'ui']),
-		pastedText: z.string().optional(),
-		projectName: z.string().optional(),
-		values: z.record(z.string()).optional(),
-	};
+  server.registerTool(
+    'start_ny_prompt',
+    {
+      title: 'Start ny prompt',
+      description: 'Åbn Workflow Wizard UI (alias)',
+      inputSchema: z.object({}),
+      _meta: {
+        'openai/widgetAccessible': true,
+        'openai/outputTemplate': 'ui://widget/workflow.html',
+        'openai/toolInvocation/invoking': 'Starting new prompt',
+        'openai/toolInvocation/invoked': 'New prompt started'
+      }
+    },
+    async () => {
+      console.log('[MCP] start_ny_prompt called');
+      return {
+        content: [
+          buildWidgetResourceContent(),
+          { type: 'text', text: 'New prompt started.' }
+        ],
+        structuredContent: { outputText: '', nextStepsText: '' }
+      };
+    }
+  );
 
-	server.registerTool(
-		'generate_prompt',
-		{
-			title: 'Generate prompt',
-			description: 'Generate a DK prompt + next steps based on pasted input.',
-			inputSchema: generatePromptInputSchema,
-			_meta: {
-				'openai/widgetAccessible': true,
-				'openai/outputTemplate': 'ui://widget/workflow.html',
-				'openai/toolInvocation/invoking': 'Generating prompt',
-				'openai/toolInvocation/invoked': 'Prompt generated',
-			},
-		},
-		async (args) => {
-			const kind = args?.kind ?? 'feature';
-			const outputText = buildPrompt({
-				kind,
-				projectName: args?.projectName,
-				pastedText: args?.pastedText,
-				values: args?.values,
-			});
+  server.registerTool(
+    'generate_prompt',
+    {
+      title: 'Generate prompt',
+      description: 'Generate a Copilot prompt + next steps based on the user input.',
+      inputSchema: GeneratePromptSchema,
+      _meta: {
+        'openai/widgetAccessible': true,
+        'openai/outputTemplate': 'ui://widget/workflow.html',
+        'openai/toolInvocation/invoking': 'Generating prompt',
+        'openai/toolInvocation/invoked': 'Prompt generated'
+      }
+    },
+    async (rawArgs) => {
+      console.log('[MCP] generate_prompt called', {
+        projectName: rawArgs?.projectName,
+        kind: rawArgs?.kind
+      });
+      const args = GeneratePromptSchema.parse(rawArgs ?? {});
+      const outputText = buildPrompt(args);
+      const nextStepsText = extractNextSteps(outputText);
+      const structuredContent = { outputText, nextStepsText };
+      const fallbackPayload = JSON.stringify(structuredContent);
 
-			return {
-				content: [{ type: 'text', text: 'Generated prompt.' }],
-				structuredContent: { outputText },
-			};
-		},
-	);
+      return {
+        content: [
+          { type: 'text', text: 'Prompt generated.' },
+          { type: 'text', text: fallbackPayload }
+        ],
+        structuredContent
+      };
+    }
+  );
 
-	return server;
+  return server;
 }
 
-const mcpServer = createWizardServer();
+async function main() {
+  const mcpServer = createWizardServer();
 
-const transport = new StreamableHTTPServerTransport({
-	sessionIdGenerator: undefined,
-	enableJsonResponse: true,
-});
+  let transport;
+  try {
+    transport = new StreamableHTTPServerTransport(MCP_PATH, mcpServer);
+  } catch {
+    transport = new StreamableHTTPServerTransport({
+      mcpPath: MCP_PATH,
+      server: mcpServer,
+      enableJsonResponse: true,
+      sessionIdGenerator: undefined
+    });
+  }
 
-await mcpServer.connect(transport);
+  if (typeof mcpServer.connect === 'function') {
+    await mcpServer.connect(transport);
+  }
 
-const httpServer = createServer(async (req, res) => {
-	const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+  const httpServer = createServer(async (req, res) => {
+    const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
 
-	if (req.method === 'OPTIONS' && url.pathname === MCP_PATH) {
-		res.writeHead(204, {
-			'Access-Control-Allow-Origin': '*',
-			'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-			'Access-Control-Allow-Headers': 'content-type, mcp-session-id',
-			'Access-Control-Expose-Headers': 'Mcp-Session-Id',
-		});
-		res.end();
-		return;
-	}
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, mcp-session-id, Mcp-Session-Id');
+    res.setHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id');
 
-	if (url.pathname === '/') {
-		res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-		res.end('Workflow Wizard MCP server');
-		return;
-	}
+    if (req.method === 'OPTIONS' && url.pathname === MCP_PATH) {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
 
-	if (url.pathname === MCP_PATH) {
-		res.setHeader('Access-Control-Allow-Origin', '*');
-		res.setHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id');
-		await transport.handleRequest(req, res);
-		return;
-	}
+    if (url.pathname === '/') {
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('Workflow Wizard MCP server');
+      return;
+    }
 
-	res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-	res.end('Not found');
-});
+    if (url.pathname === MCP_PATH) {
+      const acceptHeader = req.headers['accept'];
+      const accept = Array.isArray(acceptHeader) ? acceptHeader.join(',') : (acceptHeader ?? '');
+      const normalized = accept.toLowerCase();
+      const hasJson = normalized.includes('application/json');
+      const hasSse = normalized.includes('text/event-stream');
 
-httpServer.listen(PORT, () => {
-	console.log(`Workflow Wizard MCP server listening on http://localhost:${PORT}${MCP_PATH}`);
+      if (!hasJson || !hasSse) {
+        req.headers['accept'] = 'application/json, text/event-stream';
+      }
+
+      await transport.handleRequest(req, res);
+      return;
+    }
+
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Not found');
+  });
+
+  httpServer.listen(PORT, () => {
+    console.log(`Workflow Wizard MCP server listening on http://localhost:${PORT}`);
+    console.log(`MCP endpoint: http://localhost:${PORT}${MCP_PATH}`);
+  });
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
 });

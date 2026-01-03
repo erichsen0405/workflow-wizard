@@ -5,8 +5,19 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "web:start": "next start",
+    "lint": "eslint",
+
+    "postinstall": "npm --prefix chatgpt-app install",
+
+    "mcp": "node ./chatgpt-app/server.js",
+    "tunnel": "node ./scripts/run-cloudflared.mjs tunnel run copilotflow-mcp",
+
+    "up": "npm run mcp",
+    "up:tunnel": "concurrently -k -n MCP,TUNNEL \"npm run mcp\" \"npm run tunnel\"",
+
+    "start": "npm run up",
+    "start:tunnel": "npm run up:tunnel"
   },
   "dependencies": {
     "next": "16.1.1",
@@ -18,6 +29,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^9.1.2",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
     "tailwindcss": "^4",

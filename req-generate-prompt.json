@@ -1,0 +1,1 @@
+﻿{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"generate_prompt","arguments":{"projectName":"workflow-wizard","kind":"bug","pastedText":"Test at generate_prompt stadig virker efter resource_link fix.","systemType":"Natively","appType":"web"}}}

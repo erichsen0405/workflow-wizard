@@ -1,804 +1,600 @@
 <!DOCTYPE html>
 <html lang="da">
 <head>
-	<meta charset="utf-8" />
-	<title>Workflow Wizard Widget</title>
-	<meta name="viewport" content="width=device-width,initial-scale=1" />
-	<style>
-		:root {
-			font-family: 'Segoe UI', system-ui, sans-serif;
-			background: #f8fafc;
-			color: #0f172a;
-		}
-		body {
-			margin: 0;
-			padding: 1rem;
-		}
-		.container {
-			display: flex;
-			flex-direction: column;
-			gap: 0.75rem;
-		}
-		label {
-			font-size: 0.85rem;
-			font-weight: 600;
-			display: flex;
-			flex-direction: column;
-			gap: 0.25rem;
-		}
-		input, select, textarea, button {
-			font: inherit;
-		}
-		input, select, textarea {
-			padding: 0.5rem;
-			border: 1px solid #cbd5f5;
-			border-radius: 0.5rem;
-			background: #fff;
-		}
-		textarea {
-			min-height: 5rem;
-			resize: vertical;
-		}
-		button {
-			border: none;
-			border-radius: 0.5rem;
-			padding: 0.6rem 1rem;
-			background: #0f172a;
-			color: #fff;
-			font-weight: 600;
-			cursor: pointer;
-		}
-		button.secondary {
-			background: #475569;
-		}
-		button:disabled {
-			opacity: 0.6;
-			cursor: not-allowed;
-		}
-		.actions {
-			display: flex;
-			flex-wrap: wrap;
-			gap: 0.5rem;
-		}
-		.project-section {
-			display: flex;
-			flex-direction: column;
-			gap: 0.25rem;
-		}
-		.project-controls {
-			display: flex;
-			flex-wrap: wrap;
-			gap: 0.5rem;
-			align-items: center;
-		}
-		.project-controls select {
-			flex: 1 1 10rem;
-		}
-		.new-project {
-			display: flex;
-			flex-wrap: wrap;
-			gap: 0.5rem;
-		}
-		.new-project input {
-			flex: 1 1 12rem;
-		}
-		.hidden {
-			display: none !important;
-		}
-		.fields-section {
-			border: 1px solid #e2e8f0;
-			border-radius: 0.75rem;
-			padding: 0.75rem;
-			background: #fff;
-		}
-		.fields-header {
-			font-size: 0.85rem;
-			font-weight: 600;
-			margin-bottom: 0.5rem;
-		}
-		.fields-grid {
-			display: flex;
-			flex-direction: column;
-			gap: 0.5rem;
-		}
-		.field-item {
-			display: flex;
-			flex-direction: column;
-			gap: 0.35rem;
-		}
-		.field-item span {
-			font-size: 0.8rem;
-			color: #475569;
-		}
-		.field-item textarea {
-			min-height: 4rem;
-		}
-		.status {
-			font-size: 0.8rem;
-			color: #059669;
-		}
-	</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Workflow Wizard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+      color: #0f172a;
+    }
+    .container {
+      max-width: 820px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+      padding: 26px;
+    }
+    h1 { color: #4f46e5; margin-bottom: 10px; font-size: 26px; }
+    .info-box {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 18px;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .info-box strong { display: block; margin-bottom: 6px; color: #856404; }
+    .section {
+      margin-bottom: 18px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .section:last-child { border-bottom: none; }
+    label {
+      display: block;
+      font-weight: 650;
+      margin-bottom: 8px;
+      color: #111827;
+      font-size: 13px;
+    }
+    input[type="text"], select, textarea {
+      width: 100%;
+      padding: 11px 12px;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      font-size: 13px;
+      transition: border-color 0.2s;
+      font-family: inherit;
+      background: #fff;
+    }
+    input[type="text"]:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #6366f1;
+    }
+    textarea { resize: vertical; min-height: 92px; }
+    textarea.large { min-height: 190px; }
+    textarea.readonly { background: #f3f4f6; cursor: not-allowed; }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 640px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      border: none;
+      padding: 11px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      margin-right: 10px;
+      margin-top: 10px;
+    }
+    button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(102,126,234,0.35); }
+    button:disabled { opacity: 0.55; cursor: not-allowed; transform: none; box-shadow: none; }
+    button.secondary { background: #334155; }
+    .button-group { display: flex; gap: 10px; flex-wrap: wrap; }
+    .status {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      display: none;
+    }
+    .status.success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; display: block; }
+    .status.error { background: #fee2e2; color: #7f1d1d; border: 1px solid #fecaca; display: block; }
+    .status.info { background: #dbeafe; color: #1e3a8a; border: 1px solid #bfdbfe; display: block; }
+    .next-steps-box {
+      background: #e7f3ff;
+      border: 2px solid #2196F3;
+      border-radius: 12px;
+      padding: 14px;
+      margin-top: 12px;
+    }
+    .next-steps-box label { color: #1976D2; font-size: 15px; }
+    .hint {
+      font-size: 12px;
+      color: #475569;
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+  </style>
 </head>
 <body>
-	<div class="container">
-		<div class="project-section">
-			<label>
-				Projekt
-				<div class="project-controls">
-					<select id="projectSelect">
-						<option value="">Vælg projekt</option>
-					</select>
-					<button id="createProjectBtn" type="button">Opret</button>
-					<button id="deleteProjectBtn" type="button" class="secondary" disabled>Slet</button>
-				</div>
-			</label>
-			<div id="newProjectForm" class="new-project hidden">
-				<input id="newProjectName" placeholder="Nyt projektnavn" />
-				<button id="saveProjectBtn" type="button">Gem projekt</button>
-			</div>
-		</div>
-
-		<label>
-			Project name (valgfrit)
-			<input id="projectName" placeholder="fx Workflow Wizard" readonly />
-		</label>
-
-		<label>
-			Type
-			<select id="kind">
-				<option value="bug">Bug</option>
-				<option value="feature" selected>Feature</option>
-				<option value="enhancement">Enhancement</option>
-				<option value="ui">UI design update</option>
-			</select>
-		</label>
-
-		<label>
-			Paste specs
-			<textarea id="pastedText" placeholder="Indsæt din beskrivelse her..."></textarea>
-		</label>
-
-		<button id="parseBtn" type="button" class="secondary">Parse & udfyld</button>
-
-		<div class="fields-section">
-			<div class="fields-header">Felter</div>
-			<div id="fields" class="fields-grid"></div>
-		</div>
-
-		<button id="generateBtn">Generate</button>
-
-		<label>
-			Output
-			<textarea id="output" readonly></textarea>
-		</label>
-
-		<div class="actions">
-			<button id="copyBtn" type="button" class="secondary">Copy output</button>
-			<button id="followUpBtn" type="button" class="secondary">Copy output as message</button>
-		</div>
-
-		<div id="status" class="status"></div>
-	</div>
-
-	<script>
-		(() => {
-			const kindSelect = document.getElementById('kind');
-			const projectInput = document.getElementById('projectName');
-			const pasteInput = document.getElementById('pastedText');
-			const outputArea = document.getElementById('output');
-			const statusEl = document.getElementById('status');
-			const parseBtn = document.getElementById('parseBtn');
-			const fieldsContainer = document.getElementById('fields');
-			const projectSelect = document.getElementById('projectSelect');
-			const createProjectBtn = document.getElementById('createProjectBtn');
-			const deleteProjectBtn = document.getElementById('deleteProjectBtn');
-			const newProjectForm = document.getElementById('newProjectForm');
-			const newProjectInput = document.getElementById('newProjectName');
-			const saveProjectBtn = document.getElementById('saveProjectBtn');
-			const PROJECTS_KEY = 'copilotflow_projects_v1';
-			const ACTIVE_PROJECT_KEY = 'copilotflow_active_project_v1';
-			const fieldDefinitions = {
-				bug: [
-					{ key: 'bugId', label: 'Bug ID', type: 'text' },
-					{ key: 'title', label: 'Titel', type: 'text' },
-					{ key: 'goal', label: 'Mål', type: 'textarea' },
-					{ key: 'repro', label: 'Repro', type: 'textarea' },
-					{ key: 'expected', label: 'Forventet', type: 'textarea' },
-					{ key: 'actual', label: 'Faktisk', type: 'textarea' },
-					{ key: 'scope', label: 'Scope', type: 'textarea' },
-					{ key: 'constraints', label: 'Constraints', type: 'textarea' },
-					{ key: 'filesInserted', label: 'Indsatte filer', type: 'textarea' },
-				],
-				feature: [
-					{ key: 'featureId', label: 'Feature ID', type: 'text' },
-					{ key: 'title', label: 'Titel', type: 'text' },
-					{ key: 'goal', label: 'Mål', type: 'textarea' },
-					{ key: 'scope', label: 'Scope', type: 'textarea' },
-					{ key: 'constraints', label: 'Constraints', type: 'textarea' },
-					{ key: 'filesInserted', label: 'Indsatte filer', type: 'textarea' },
-				],
-				enhancement: [
-					{ key: 'featureId', label: 'Feature ID', type: 'text' },
-					{ key: 'title', label: 'Titel', type: 'text' },
-					{ key: 'goal', label: 'Mål', type: 'textarea' },
-					{ key: 'scope', label: 'Scope', type: 'textarea' },
-					{ key: 'constraints', label: 'Constraints', type: 'textarea' },
-					{ key: 'filesInserted', label: 'Indsatte filer', type: 'textarea' },
-				],
-				ui: [
-					{ key: 'featureId', label: 'UI / Feature ID', type: 'text' },
-					{ key: 'title', label: 'Titel', type: 'text' },
-					{ key: 'goal', label: 'Mål', type: 'textarea' },
-					{ key: 'scope', label: 'Scope', type: 'textarea' },
-					{ key: 'constraints', label: 'Constraints', type: 'textarea' },
-					{ key: 'filesInserted', label: 'Indsatte filer', type: 'textarea' },
-					{ key: 'designNotes', label: 'Design notes', type: 'textarea' },
-				],
-			};
-			const sectionLabels = {
-				goal: ['Mål', 'Goal', 'Objective'],
-				repro: ['Repro', 'Reproduktion', 'Steps to reproduce'],
-				expected: ['Forventet', 'Expected'],
-				actual: ['Faktisk', 'Actual'],
-				scope: ['Scope'],
-				constraints: ['Constraints', 'Krav', 'Begrænsninger'],
-				filesInserted: ['Filer', 'Files', 'Affected files', 'Indsatte filer'],
-				designNotes: ['Design', 'UI', 'Mock', 'Design notes'],
-			};
-			const values = {};
-			let projects = [];
-			let activeProjectId = null;
-			const checklist =
-				'✅ NÆSTE SKRIDT\n' +
-				'1. Indsæt ændrede filer til validering.\n' +
-				'2. Kør lokale tests / build.\n' +
-				'3. Notér observationer & logs.\n' +
-				'4. Commit med passende besked.\n' +
-				'5. Del status og næste skridt.';
-
-			const headerLabels = {
-				bug: 'BUG PROMPT',
-				feature: 'FEATURE PROMPT',
-				enhancement: 'ENHANCEMENT PROMPT',
-				ui: 'UI DESIGN PROMPT',
-			};
-
-			const setStatus = (text, isError = false) => {
-				statusEl.textContent = text;
-				statusEl.style.color = isError ? '#dc2626' : '#059669';
-				if (!text) return;
-				setTimeout(() => {
-					if (statusEl.textContent === text) statusEl.textContent = '';
-				}, 4000);
-			};
-
-			const updateOutput = (text) => {
-				outputArea.value = text ?? '';
-			};
-
-			const getFieldDefs = (kind) => fieldDefinitions[kind] ?? [];
-
-			const renderFields = (kind) => {
-				const defs = getFieldDefs(kind);
-				const allowedKeys = new Set(defs.map((def) => def.key));
-				Object.keys(values).forEach((key) => {
-					if (!allowedKeys.has(key)) delete values[key];
-				});
-				defs.forEach((def) => {
-					if (!(def.key in values)) values[def.key] = '';
-				});
-				fieldsContainer.innerHTML = '';
-				defs.forEach((def) => {
-					const wrapper = document.createElement('label');
-					wrapper.className = 'field-item';
-					const span = document.createElement('span');
-					span.textContent = def.label;
-					const control = def.type === 'textarea' ? document.createElement('textarea') : document.createElement('input');
-					if (def.type !== 'textarea') control.type = 'text';
-					control.value = values[def.key] ?? '';
-					control.addEventListener('input', (event) => {
-						values[def.key] = event.target.value;
-					});
-					wrapper.appendChild(span);
-					wrapper.appendChild(control);
-					fieldsContainer.appendChild(wrapper);
-				});
-			};
-
-			const trimValue = (value) => (value ?? '').toString().trim();
-
-			const getTrimmedValues = () => {
-				const entries = Object.entries(values)
-					.map(([key, value]) => [key, trimValue(value)])
-					.filter(([, val]) => val.length > 0);
-				return Object.fromEntries(entries);
-			};
-
-			const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-			const parsePasted = (kind, text) => {
-				const defs = getFieldDefs(kind);
-				const allowedKeys = new Set(defs.map((def) => def.key));
-				const result = {};
-				if (!text || !text.trim()) return result;
-				const lines = text.split(/\r?\n/);
-				const firstLine = lines[0]?.trim();
-				const idKey = kind === 'bug' ? 'bugId' : 'featureId';
-				if (firstLine && allowedKeys.has(idKey)) {
-					const idMatch = firstLine.match(/^([A-Za-z]+-\d+)\s*[:\-–]\s*(.+)$/);
-					if (idMatch) {
-						result[idKey] = idMatch[1].trim();
-						const title = idMatch[2]?.trim();
-						if (title && allowedKeys.has('title')) {
-							result.title = title;
-						}
-					}
-				}
-
-				const sectionMatchers = Object.entries(sectionLabels)
-					.filter(([key]) => allowedKeys.has(key))
-					.map(([key, labels]) => ({
-						key,
-						patterns: labels.map((label) => new RegExp(`^${escapeRegex(label)}\\s*[:：\\-–—]?\\s*(.*)$`, 'i')),
-					}));
-
-				const flush = (key, buffer) => {
-					if (key && buffer.length) {
-						const textValue = buffer.join('\n').trim();
-						if (textValue) result[key] = textValue;
-					}
-				};
-
-				let currentKey = null;
-				let buffer = [];
-
-				for (const rawLine of lines) {
-					const line = rawLine.trimEnd();
-					let matched = false;
-					for (const matcher of sectionMatchers) {
-						for (const pattern of matcher.patterns) {
-							const match = line.match(pattern);
-							if (!match) continue;
-							flush(currentKey, buffer);
-							currentKey = matcher.key;
-							buffer = [];
-							const immediate = (match[1] ?? '').trim();
-							if (immediate) buffer.push(immediate);
-							matched = true;
-							break;
-						}
-						if (matched) break;
-					}
-					if (!matched && currentKey) {
-						buffer.push(line);
-					}
-				}
-
-				flush(currentKey, buffer);
-				return result;
-			};
-
-			renderFields(kindSelect.value);
-
-			const safeReadJSON = (key, fallback) => {
-				try {
-					const raw = window.localStorage?.getItem?.(key);
-					if (!raw) return fallback;
-					return JSON.parse(raw);
-				} catch (error) {
-					console.warn('Storage read failed', error);
-					return fallback;
-				}
-			};
-
-			const safeWriteJSON = (key, value) => {
-				try {
-					window.localStorage?.setItem?.(key, JSON.stringify(value));
-				} catch (error) {
-					console.warn('Storage write failed', error);
-				}
-			};
-
-			const loadProjects = () => safeReadJSON(PROJECTS_KEY, []);
-			const saveProjects = (nextProjects) => safeWriteJSON(PROJECTS_KEY, nextProjects);
-
-			const loadActiveProjectId = () => {
-				try {
-					return window.localStorage?.getItem?.(ACTIVE_PROJECT_KEY) ?? null;
-				} catch (error) {
-					console.warn('Active project read failed', error);
-					return null;
-				}
-			};
-
-			const saveActiveProjectId = (id) => {
-				try {
-					const storage = window.localStorage;
-					if (!storage) return;
-					if (id) {
-						storage.setItem(ACTIVE_PROJECT_KEY, id);
-					} else {
-						storage.removeItem(ACTIVE_PROJECT_KEY);
-					}
-				} catch (error) {
-					console.warn('Active project write failed', error);
-				}
-			};
-
-			const generateProjectId = () => {
-				if (window.crypto?.randomUUID) return window.crypto.randomUUID();
-				return `proj-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-			};
-
-			const getActiveProject = () => projects.find((project) => project.id === activeProjectId) ?? null;
-
-			const syncProjectNameField = () => {
-				const activeProject = getActiveProject();
-				projectInput.value = activeProject?.name ?? '';
-				projectInput.placeholder = activeProject ? '' : 'Vælg eller opret et projekt';
-			};
-
-			const renderProjectsUI = () => {
-				projectSelect.innerHTML = '';
-				const placeholderOption = document.createElement('option');
-				placeholderOption.value = '';
-				placeholderOption.textContent = 'Vælg projekt';
-				projectSelect.appendChild(placeholderOption);
-				projects.forEach((project) => {
-					const option = document.createElement('option');
-					option.value = project.id;
-					option.textContent = project.name;
-					projectSelect.appendChild(option);
-				});
-				projectSelect.value = activeProjectId ?? '';
-				deleteProjectBtn.disabled = !activeProjectId;
-				syncProjectNameField();
-			};
-
-			const setActiveProject = (id) => {
-				if (id && projects.some((project) => project.id === id)) {
-					activeProjectId = id;
-				} else {
-					activeProjectId = null;
-				}
-				saveActiveProjectId(activeProjectId);
-				renderProjectsUI();
-			};
-
-			const toggleNewProjectForm = (shouldShow) => {
-				if (shouldShow) {
-					newProjectForm.classList.remove('hidden');
-					newProjectInput.focus();
-				} else {
-					newProjectForm.classList.add('hidden');
-					newProjectInput.value = '';
-				}
-			};
-
-			const handleSaveProject = () => {
-				const name = newProjectInput.value.trim();
-				if (!name) {
-					setStatus('Angiv projektnavn', true);
-					newProjectInput.focus();
-					return;
-				}
-				const newProject = {
-					id: generateProjectId(),
-					name,
-					createdAt: new Date().toISOString(),
-				};
-				projects = [...projects, newProject];
-				saveProjects(projects);
-				setActiveProject(newProject.id);
-				toggleNewProjectForm(false);
-				setStatus('Projekt oprettet');
-			};
-
-			const handleDeleteProject = () => {
-				const activeProject = getActiveProject();
-				if (!activeProject) return;
-				const confirmed = window.confirm(`Slet projekt "${activeProject.name}"?`);
-				if (!confirmed) return;
-				projects = projects.filter((project) => project.id !== activeProject.id);
-				saveProjects(projects);
-				if (activeProjectId === activeProject.id) {
-					setActiveProject(null);
-				} else {
-					renderProjectsUI();
-				}
-				setStatus('Projekt slettet');
-			};
-
-			const initializeProjects = () => {
-				projects = loadProjects();
-				activeProjectId = loadActiveProjectId();
-				if (!projects.some((project) => project.id === activeProjectId)) {
-					activeProjectId = null;
-					saveActiveProjectId(null);
-				}
-				renderProjectsUI();
-			};
-
-			initializeProjects();
-
-			createProjectBtn.addEventListener('click', () => {
-				const shouldShow = newProjectForm.classList.contains('hidden');
-				toggleNewProjectForm(shouldShow);
-			});
-
-			saveProjectBtn.addEventListener('click', handleSaveProject);
-
-			newProjectInput.addEventListener('keydown', (event) => {
-				if (event.key === 'Enter') {
-					event.preventDefault();
-					handleSaveProject();
-				}
-			});
-
-			deleteProjectBtn.addEventListener('click', handleDeleteProject);
-
-			projectSelect.addEventListener('change', (event) => {
-				setActiveProject(event.target.value || null);
-			});
-
-			kindSelect.addEventListener('change', () => {
-				renderFields(kindSelect.value);
-			});
-
-			parseBtn.addEventListener('click', () => {
-				const text = pasteInput.value;
-				if (!text.trim()) {
-					setStatus('Indsæt specs først', true);
-					return;
-				}
-				const parsed = parsePasted(kindSelect.value, text);
-				let applied = false;
-				Object.entries(parsed).forEach(([key, value]) => {
-					const trimmedValue = (value ?? '').trim();
-					if (trimmedValue) {
-						values[key] = trimmedValue;
-						applied = true;
-					}
-				});
-				renderFields(kindSelect.value);
-				if (applied) {
-					setStatus('Felter udfyldt – tjek og ret hvis nødvendigt');
-				} else {
-					setStatus('Kunne ikke parse felter', true);
-				}
-			});
-
-			const hydrateFromToolOutput = (toolOutput) => {
-				if (!toolOutput) return;
-				let kindChanged = false;
-				if (toolOutput.kind && kindSelect.value !== toolOutput.kind) {
-					kindSelect.value = toolOutput.kind;
-					kindChanged = true;
-				}
-				if (typeof toolOutput.outputText === 'string') {
-					updateOutput(toolOutput.outputText);
-				}
-				if (kindChanged) {
-					renderFields(kindSelect.value);
-				}
-			};
-
-			const extractToolOutput = (detail) => {
-				if (!detail) return undefined;
-				return detail.globals?.toolOutput ?? detail.toolOutput;
-			};
-
-			if (window.openai?.toolOutput) {
-				hydrateFromToolOutput(window.openai.toolOutput);
-			}
-
-			window.addEventListener('openai:set_globals', (event) => {
-				const globalsToolOutput = extractToolOutput(event.detail);
-				if (globalsToolOutput) {
-					window.openai = window.openai ?? {};
-					window.openai.toolOutput = globalsToolOutput;
-				}
-				hydrateFromToolOutput(globalsToolOutput);
-			});
-
-			const hasStructuredValues = (record) =>
-				Object.values(record ?? {}).some((value) => trimValue(value).length > 0);
-
-			const buildStructuredOutputSections = (kind, structuredValues) => {
-				if (!hasStructuredValues(structuredValues)) return [];
-				const get = (key) => trimValue(structuredValues?.[key]);
-				const sections = [];
-				if (kind === 'bug') {
-					const bugId = get('bugId');
-					const title = get('title');
-					if (bugId && title) {
-						sections.push(`Titel: ${bugId} – ${title}`);
-					} else if (title) {
-						sections.push(`Titel: ${title}`);
-					} else if (bugId) {
-						sections.push(`Titel: ${bugId}`);
-					}
-					const labelMap = {
-						goal: 'Mål',
-						repro: 'Repro',
-						expected: 'Forventet',
-						actual: 'Faktisk',
-						scope: 'Scope',
-						constraints: 'Constraints',
-						filesInserted: 'Indsatte filer',
-					};
-					['goal', 'repro', 'expected', 'actual', 'scope', 'constraints', 'filesInserted'].forEach((key) => {
-						const value = get(key);
-						if (value) sections.push(`${labelMap[key]}: ${value}`);
-					});
-					return sections;
-				}
-
-				const addCommonSections = (keys, labels) => {
-					keys.forEach((key, index) => {
-						const value = get(key);
-						if (value) sections.push(`${labels[index]}: ${value}`);
-					});
-				};
-
-				if (kind === 'feature' || kind === 'enhancement') {
-					const featureId = get('featureId');
-					if (featureId) sections.push(`Feature: ${featureId}`);
-					const title = get('title');
-					if (title) sections.push(`Titel: ${title}`);
-					addCommonSections(
-						['goal', 'scope', 'constraints', 'filesInserted'],
-						['Mål', 'Scope', 'Constraints', 'Indsatte filer'],
-					);
-					return sections;
-				}
-
-				if (kind === 'ui') {
-					const featureId = get('featureId');
-					if (featureId) sections.push(`UI update: ${featureId}`);
-					const title = get('title');
-					if (title) sections.push(`Titel: ${title}`);
-					addCommonSections(
-						['goal', 'scope', 'constraints', 'filesInserted', 'designNotes'],
-						['Mål', 'Scope', 'Constraints', 'Indsatte filer', 'Design notes'],
-					);
-					return sections;
-				}
-
-				return sections;
-			};
-
-			const formatOutput = (kind, projectName, pastedText, structuredValues = {}) => {
-				const lines = [headerLabels[kind] ?? 'PROMPT'];
-				if (projectName) lines.push(`Projekt: ${projectName}`);
-				const structuredSections = buildStructuredOutputSections(kind, structuredValues);
-				if (structuredSections.length) {
-					lines.push('', ...structuredSections, '', checklist);
-					return lines.join('\n');
-				}
-				const fallbackInput = trimValue(pastedText) || '(ingen input)';
-				lines.push('', 'INPUT:', fallbackInput, '', checklist);
-				return lines.join('\n');
-			};
-
-			const buildPayload = () => {
-				const activeProject = getActiveProject();
-				if (!activeProject) return null;
-				return {
-					kind: kindSelect.value,
-					pastedText: pasteInput.value,
-					projectName: activeProject.name,
-					values: getTrimmedValues(),
-				};
-			};
-
-			const generateLocally = (payload, { skipStatus = false } = {}) => {
-				const kind = payload?.kind ?? kindSelect.value;
-				const projectNameRaw = payload?.projectName ?? projectInput.value;
-				const projectName = typeof projectNameRaw === 'string' ? projectNameRaw.trim() : '';
-				const pastedText = typeof payload?.pastedText === 'string' ? payload.pastedText : pasteInput.value;
-				const outputText = formatOutput(kind, projectName, pastedText, payload?.values ?? getTrimmedValues());
-				updateOutput(outputText);
-				if (!skipStatus) {
-					setStatus('Lokalt output genereret');
-				}
-			};
-
-			const getOutputTextFromResponse = (response) => {
-				const directOutput =
-					response?.structuredContent?.outputText ??
-					response?.structured_content?.outputText ??
-					response?.toolOutput?.outputText;
-				if (typeof directOutput === 'string') {
-					return directOutput;
-				}
-				const latestGlobalOutput = window.openai?.toolOutput?.outputText;
-				return typeof latestGlobalOutput === 'string' ? latestGlobalOutput : undefined;
-			};
-
-			const handleToolGeneration = async (payload) => {
-				setStatus('Generating…');
-				const response = await window.openai.callTool('generate_prompt', payload);
-				const outputText = getOutputTextFromResponse(response);
-				if (typeof outputText === 'string') {
-					updateOutput(outputText);
-					setStatus('Done');
-					return;
-				}
-				setStatus('Ingen outputText – bruger fallback', true);
-				generateLocally(payload, { skipStatus: true });
-			};
-
-			document.getElementById('generateBtn').addEventListener('click', async () => {
-				const payload = buildPayload();
-				if (!payload) {
-					setStatus('Vælg eller opret et projekt først', true);
-					return;
-				}
-				const hasValues = hasStructuredValues(payload.values);
-				if (!hasValues && !trimValue(payload.pastedText)) {
-					setStatus('Indsæt tekst eller udfyld felter', true);
-					return;
-				}
-				let skipLocalStatus = false;
-
-				if (window.openai?.callTool) {
-					try {
-						await handleToolGeneration(payload);
-						return;
-					} catch (error) {
-						console.error(error);
-						setStatus('Tool fejlede – fallback', true);
-						skipLocalStatus = true;
-					}
-				}
-
-				generateLocally(payload, { skipStatus: skipLocalStatus });
-			});
-
-			const copyOutput = async () => {
-				const text = outputArea.value;
-				if (!text) {
-					setStatus('Intet output at kopiere', true);
-					return;
-				}
-				try {
-					if (navigator.clipboard?.writeText) {
-						await navigator.clipboard.writeText(text);
-					} else {
-						outputArea.select();
-						document.execCommand('copy');
-						outputArea.setSelectionRange(0, 0);
-					}
-					setStatus('Output kopieret');
-				} catch (error) {
-					console.error(error);
-					setStatus('Kunne ikke kopiere', true);
-				}
-			};
-
-			document.getElementById('copyBtn').addEventListener('click', copyOutput);
-
-			document.getElementById('followUpBtn').addEventListener('click', async () => {
-				const text = outputArea.value;
-				if (!text) {
-					setStatus('Intet output at sende', true);
-					return;
-				}
-				const followUpSender = window.openai?.sendFollowUpMessage ?? window.openai?.sendFollowupMessage;
-				if (followUpSender) {
-					try {
-						await followUpSender({ prompt: text });
-						setStatus('Output sendt som follow-up');
-					} catch (error) {
-						console.error(error);
-						setStatus('Kunne ikke sende follow-up', true);
-					}
-				} else {
-					await copyOutput();
-				}
-			});
-		})();
-	</script>
+  <div class="container">
+    <h1>Workflow Wizard</h1>
+
+    <div class="info-box">
+      <strong>Husk før du starter</strong>
+      ✅ Start wizard fra chatten inde i det ChatGPT Project der hører til app’en<br />
+      ✅ Dobbelttjek at <b>Projekt</b> + <b>System (Base44/Natively)</b> matcher
+    </div>
+
+    <!-- Projekt -->
+    <div class="section">
+      <label>Projekt</label>
+      <select id="projectSelect">
+        <option value="">Vælg projekt</option>
+      </select>
+      <div class="button-group">
+        <button id="createProjectBtn" type="button">Opret projekt</button>
+        <button id="deleteProjectBtn" type="button" class="secondary" disabled>Slet projekt</button>
+      </div>
+
+      <div class="hint">Projekt bliver auto-udfyldt via “senest aktive projekt” (localStorage). Det kan ikke læses direkte fra dit ChatGPT Project.</div>
+
+      <label style="margin-top:12px;">Project name (auto)</label>
+      <input id="projectName" type="text" readonly placeholder="Vælg eller opret et projekt" />
+    </div>
+
+    <!-- System / App -->
+    <div class="section">
+      <div class="grid-2">
+        <div>
+          <label>System</label>
+          <select id="systemType">
+            <option value="Natively">Natively</option>
+            <option value="Base44">Base44</option>
+          </select>
+        </div>
+        <div>
+          <label>App-type</label>
+          <select id="appType">
+            <option value="web">Web</option>
+            <option value="react-native-expo">React Native / Expo</option>
+            <option value="backend">Backend</option>
+          </select>
+        </div>
+      </div>
+
+      <label style="margin-top:12px;">Copilot model</label>
+      <input id="copilotModel" type="text" value="GPT-5.1-Codex" />
+    </div>
+
+    <!-- Fix type + brief -->
+    <div class="section">
+      <label>Type</label>
+      <select id="kindSelect">
+        <option value="bug">Bug</option>
+        <option value="feature" selected>Feature</option>
+        <option value="ui">UI design</option>
+        <option value="enhancement">Enhancement</option>
+      </select>
+
+      <label style="margin-top:12px;">BUG/FEATURE BRIEF (paste her)</label>
+      <textarea id="pastedText" class="large" placeholder="Indsæt beskrivelse af problemet/feature, repro, scope, constraints, og indsatte filer (hel tekst)"></textarea>
+
+      <div class="button-group">
+        <button id="generateBtn" type="button">Generer prompt</button>
+        <button id="copyPromptBtn" type="button" class="secondary">Copy Copilot prompt</button>
+      </div>
+      <div id="genStatus" class="status"></div>
+    </div>
+
+    <!-- Output -->
+    <div class="section">
+      <label>Copilot prompt</label>
+      <textarea id="output" class="large readonly" readonly></textarea>
+
+      <div class="next-steps-box">
+        <label>✅ Næste skridt</label>
+        <textarea id="nextSteps" class="readonly" readonly></textarea>
+      </div>
+
+      <div class="hint">“Næste skridt” udfyldes automatisk ud fra prompten (fra ✅ NÆSTE SKRIDT-blokken).</div>
+    </div>
+
+    <!-- Follow-up -->
+    <div class="section">
+      <label>Svar fra Copilot</label>
+      <textarea id="copilotAnswer" class="large" placeholder="Indsæt Copilots svar her..."></textarea>
+
+      <label style="margin-top:12px;">Indhold af ændrede filer</label>
+      <textarea id="changedFiles" class="large" placeholder="Indsæt hele indholdet af de ændrede filer her (1:1)"></textarea>
+
+      <label style="margin-top:12px;">Status</label>
+      <select id="issueStatus">
+        <option value="not_solved">Ikke løst</option>
+        <option value="solved">Løst</option>
+      </select>
+
+      <div class="button-group">
+        <button id="sendBtn" type="button">Send</button>
+        <button id="startNewBtn" type="button" class="secondary">Start ny prompt</button>
+      </div>
+      <div id="sendStatus" class="status"></div>
+    </div>
+  </div>
+
+  <script>
+    const PROJECTS_KEY = 'copilotflow_projects_v1';
+    const ACTIVE_PROJECT_KEY = 'copilotflow_active_project_v1';
+
+    const SOLVED_NEXT_STEPS_TEXT =
+      '✅ NÆSTE SKRIDT (LØST)\n' +
+      '1) Merge branch → main\n' +
+      '   - PR-flow: Opret PR på GitHub → Merge → Pull latest på main i VS Code.\n' +
+      '   - Lokal merge (terminal):\n' +
+      '     a) git checkout main\n' +
+      '     b) git pull\n' +
+      '     c) git merge <din-branch>\n' +
+      '     d) git push\n' +
+      '\n' +
+      '2) Slet branch\n' +
+      '   - Lokalt: git branch -d <din-branch>\n' +
+      '   - Remote: git push origin --delete <din-branch>\n' +
+      '\n' +
+      '3) Bekræft\n' +
+      '   - Kør tests igen lokalt og bekræft at main er grøn.\n';
+
+    const els = {
+      projectSelect: document.getElementById('projectSelect'),
+      createProjectBtn: document.getElementById('createProjectBtn'),
+      deleteProjectBtn: document.getElementById('deleteProjectBtn'),
+      projectName: document.getElementById('projectName'),
+
+      systemType: document.getElementById('systemType'),
+      appType: document.getElementById('appType'),
+      copilotModel: document.getElementById('copilotModel'),
+
+      kindSelect: document.getElementById('kindSelect'),
+      pastedText: document.getElementById('pastedText'),
+
+      generateBtn: document.getElementById('generateBtn'),
+      copyPromptBtn: document.getElementById('copyPromptBtn'),
+      genStatus: document.getElementById('genStatus'),
+
+      output: document.getElementById('output'),
+      nextSteps: document.getElementById('nextSteps'),
+
+      copilotAnswer: document.getElementById('copilotAnswer'),
+      changedFiles: document.getElementById('changedFiles'),
+      issueStatus: document.getElementById('issueStatus'),
+
+      sendBtn: document.getElementById('sendBtn'),
+      startNewBtn: document.getElementById('startNewBtn'),
+      sendStatus: document.getElementById('sendStatus')
+    };
+
+    // Holder på "normale" next steps fra generate_prompt, så vi kan toggle tilbage hvis status skifter.
+    let lastGeneratedNextStepsText = '';
+
+    function showStatus(el, message, type='info') {
+      el.textContent = message;
+      el.className = `status ${type}`;
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 4500);
+    }
+
+    function safeReadJSON(key, fallback) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return fallback;
+        return JSON.parse(raw);
+      } catch {
+        return fallback;
+      }
+    }
+    function safeWriteJSON(key, value) {
+      try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+    }
+
+    function loadProjects() {
+      return safeReadJSON(PROJECTS_KEY, []);
+    }
+    function saveProjects(projects) {
+      safeWriteJSON(PROJECTS_KEY, projects);
+    }
+    function loadActiveProjectId() {
+      try { return localStorage.getItem(ACTIVE_PROJECT_KEY) || ''; } catch { return ''; }
+    }
+    function saveActiveProjectId(id) {
+      try {
+        if (id) localStorage.setItem(ACTIVE_PROJECT_KEY, id);
+        else localStorage.removeItem(ACTIVE_PROJECT_KEY);
+      } catch {}
+    }
+
+    function uuid() {
+      if (crypto && crypto.randomUUID) return crypto.randomUUID();
+      return `proj-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+    }
+
+    let projects = [];
+    let activeProjectId = '';
+
+    function getActiveProject() {
+      return projects.find(p => p.id === activeProjectId) || null;
+    }
+
+    function renderProjects() {
+      els.projectSelect.innerHTML = '';
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = 'Vælg projekt';
+      els.projectSelect.appendChild(placeholder);
+
+      projects.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name;
+        els.projectSelect.appendChild(opt);
+      });
+
+      els.projectSelect.value = activeProjectId || '';
+      els.deleteProjectBtn.disabled = !activeProjectId;
+
+      const ap = getActiveProject();
+      els.projectName.value = ap?.name || '';
+      els.projectName.placeholder = ap ? '' : 'Vælg eller opret et projekt';
+    }
+
+    function initProjects() {
+      projects = loadProjects();
+      activeProjectId = loadActiveProjectId();
+      if (activeProjectId && !projects.some(p => p.id === activeProjectId)) {
+        activeProjectId = '';
+        saveActiveProjectId('');
+      }
+      renderProjects();
+    }
+
+    els.createProjectBtn.addEventListener('click', () => {
+      const name = prompt('Projektnavn (fx "Football Coach — Natively")');
+      if (!name || !name.trim()) return;
+      const newProject = { id: uuid(), name: name.trim(), createdAt: new Date().toISOString() };
+      projects = [...projects, newProject];
+      saveProjects(projects);
+      activeProjectId = newProject.id;
+      saveActiveProjectId(activeProjectId);
+      renderProjects();
+    });
+
+    els.deleteProjectBtn.addEventListener('click', () => {
+      const ap = getActiveProject();
+      if (!ap) return;
+      if (!confirm(`Slet projekt "${ap.name}"?`)) return;
+      projects = projects.filter(p => p.id !== ap.id);
+      saveProjects(projects);
+      activeProjectId = '';
+      saveActiveProjectId('');
+      renderProjects();
+    });
+
+    els.projectSelect.addEventListener('change', (e) => {
+      activeProjectId = e.target.value || '';
+      saveActiveProjectId(activeProjectId);
+      renderProjects();
+    });
+
+    function safeParseJSON(text) {
+      try {
+        return JSON.parse(text);
+      } catch {
+        return null;
+      }
+    }
+
+    function tryExtractStructured(obj) {
+      if (!obj || typeof obj !== 'object') return null;
+      const result = { outputText: '', nextStepsText: '' };
+      let found = false;
+
+      if (typeof obj.outputText === 'string') {
+        result.outputText = obj.outputText;
+        found = true;
+      }
+      if (typeof obj.nextStepsText === 'string') {
+        result.nextStepsText = obj.nextStepsText;
+        found = true;
+      }
+
+      if (found) return result;
+
+      if (obj.structuredContent && typeof obj.structuredContent === 'object') {
+        return tryExtractStructured(obj.structuredContent);
+      }
+
+      return null;
+    }
+
+    function extractFromContentArray(content) {
+      if (!Array.isArray(content)) return null;
+      for (const item of content) {
+        if (item?.type === 'text' && typeof item.text === 'string') {
+          const parsed = safeParseJSON(item.text);
+          const extracted = tryExtractStructured(parsed);
+          if (extracted) return extracted;
+        }
+      }
+      return null;
+    }
+
+    function deriveStructuredContent(resp) {
+      const candidates = [
+        resp?.structuredContent,
+        resp?.structured_content,
+        resp?.toolOutput,
+        resp?.result,
+        resp?.data,
+        window?.openai?.toolOutput
+      ];
+
+      for (const candidate of candidates) {
+        const extracted = tryExtractStructured(candidate);
+        if (extracted) return extracted;
+      }
+
+      return extractFromContentArray(resp?.content);
+    }
+
+    function syncNextStepsWithStatus() {
+      if (els.issueStatus.value === 'solved') {
+        els.nextSteps.value = SOLVED_NEXT_STEPS_TEXT;
+      } else {
+        els.nextSteps.value = lastGeneratedNextStepsText || '';
+      }
+    }
+
+    els.issueStatus.addEventListener('change', syncNextStepsWithStatus);
+
+    async function generatePrompt() {
+      const ap = getActiveProject();
+      if (!ap) {
+        showStatus(els.genStatus, 'Vælg eller opret et projekt først', 'error');
+        return;
+      }
+
+      const payload = {
+        projectName: ap.name,
+        systemType: els.systemType.value,
+        appType: els.appType.value,
+        copilotModel: els.copilotModel.value,
+        kind: els.kindSelect.value,
+        pastedText: els.pastedText.value
+      };
+
+      if (!payload.pastedText.trim()) {
+        showStatus(els.genStatus, 'Indsæt BUG/FEATURE BRIEF først', 'error');
+        return;
+      }
+
+      els.generateBtn.disabled = true;
+      showStatus(els.genStatus, 'Genererer...', 'info');
+
+      try {
+        let resp;
+        if (window.openai?.callTool) {
+          resp = await window.openai.callTool('generate_prompt', payload);
+        } else {
+          throw new Error('window.openai.callTool findes ikke i denne host');
+        }
+
+        const structured = deriveStructuredContent(resp);
+
+        if (!structured) {
+          const debugPayload = JSON.stringify(resp ?? {}, null, 2) || '';
+          els.output.value = debugPayload.slice(0, 8000);
+          lastGeneratedNextStepsText = '';
+          syncNextStepsWithStatus();
+          showStatus(els.genStatus, 'Kunne ikke læse tool output – debug sat i output-feltet', 'error');
+          return;
+        }
+
+        els.output.value = structured.outputText || '';
+        lastGeneratedNextStepsText = structured.nextStepsText || '';
+        syncNextStepsWithStatus();
+
+        showStatus(els.genStatus, '✅ Done', 'success');
+      } catch (err) {
+        console.error(err);
+        showStatus(els.genStatus, `Fejl: ${err.message || err}`, 'error');
+      } finally {
+        els.generateBtn.disabled = false;
+      }
+    }
+
+    els.generateBtn.addEventListener('click', generatePrompt);
+
+    els.copyPromptBtn.addEventListener('click', async () => {
+      const text = els.output.value;
+      if (!text) return showStatus(els.genStatus, 'Intet at kopiere', 'error');
+      try {
+        await navigator.clipboard.writeText(text);
+        showStatus(els.genStatus, 'Copilot prompt kopieret', 'success');
+      } catch {
+        showStatus(els.genStatus, 'Kunne ikke kopiere', 'error');
+      }
+    });
+
+    function buildFollowUpMessage() {
+      const ap = getActiveProject();
+      const status = els.issueStatus.value === 'solved' ? 'Løst' : 'Ikke løst';
+
+      return (
+        'WORKFLOW WIZARD – OPFØLGNING\n' +
+        `Projekt: ${ap?.name || ''}\n` +
+        `System: ${els.systemType.value}\n` +
+        `App-type: ${els.appType.value}\n` +
+        `Type: ${els.kindSelect.value}\n` +
+        `Status: ${status}\n\n` +
+        'Svar fra Copilot:\n' +
+        (els.copilotAnswer.value.trim() || '(intet indsat)') +
+        '\n\n' +
+        'Indhold af ændrede filer:\n' +
+        (els.changedFiles.value.trim() || '(intet indsat)') +
+        '\n'
+      );
+    }
+
+    els.sendBtn.addEventListener('click', async () => {
+      const ap = getActiveProject();
+      if (!ap) {
+        showStatus(els.sendStatus, 'Vælg et projekt først', 'error');
+        return;
+      }
+
+      // sørg for UI matcher status inden send
+      syncNextStepsWithStatus();
+
+      const followUp = buildFollowUpMessage();
+
+      els.sendBtn.disabled = true;
+      showStatus(els.sendStatus, 'Sender til ChatGPT...', 'info');
+
+      try {
+        const sender = window.openai?.sendFollowUpMessage || window.openai?.sendFollowupMessage;
+        if (!sender) throw new Error('sendFollowUpMessage findes ikke i denne host');
+
+        await sender({ prompt: followUp });
+
+        if (els.issueStatus.value === 'solved') {
+          showStatus(els.sendStatus, '✅ Sendt – issue markeret som løst', 'success');
+        } else {
+          showStatus(els.sendStatus, '✅ Sendt', 'success');
+        }
+      } catch (err) {
+        console.error(err);
+        try {
+          await navigator.clipboard.writeText(followUp);
+          showStatus(els.sendStatus, 'Kunne ikke sende. Jeg kopierede teksten til clipboard i stedet.', 'error');
+        } catch {
+          showStatus(els.sendStatus, `Fejl: ${err.message || err}`, 'error');
+        }
+      } finally {
+        els.sendBtn.disabled = false;
+      }
+    });
+
+    els.startNewBtn.addEventListener('click', () => {
+      els.kindSelect.value = 'feature';
+      els.pastedText.value = '';
+      els.output.value = '';
+      lastGeneratedNextStepsText = '';
+      els.nextSteps.value = '';
+      els.copilotAnswer.value = '';
+      els.changedFiles.value = '';
+      els.issueStatus.value = 'not_solved';
+      syncNextStepsWithStatus();
+      showStatus(els.sendStatus, 'Klar til næste issue (projekt/system/app-type beholdes)', 'success');
+      els.pastedText.focus();
+    });
+
+    initProjects();
+    syncNextStepsWithStatus();
+  </script>
 </body>
 </html>
